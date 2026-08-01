@@ -228,11 +228,8 @@ export default function Page() {
         <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
         {ambience && (
           <>
-            {/* outermost soft light first, crisp edge last, so the hairline
-                sits on top of its own glow */}
-            <div className="frame-layer frame-halo-far" aria-hidden="true" />
+            {/* halo first, crisp edge on top of it */}
             <div className="frame-layer frame-halo" aria-hidden="true" />
-            <div className="frame-glow" aria-hidden="true" />
             <div className="frame-layer frame" aria-hidden="true" />
           </>
         )}
