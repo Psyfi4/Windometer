@@ -21,6 +21,7 @@
      interface chrome reads from this one variable. */
   --accent: #5fd3c4;
   --on-accent: #08100e;
+  --frame-w: 5px;
   --violet: #9d8ce0;
   --amber: #e3a857;
   --coral: #e56c73;
@@ -54,6 +55,15 @@ h1, h2, h3, h4 {
 a { color: var(--accent); }
 
 /* ---------------- layout ---------------- */
+
+/* Carries the theme custom properties for everything below it, including the
+   fixed-position frame and backdrop.
+
+   Do not give this element transform, filter, backdrop-filter, perspective or
+   contain: any of those would make it the containing block for its fixed
+   descendants, and the frame would scroll away with the page instead of
+   staying pinned to the window. */
+.app-root { min-height: 100vh; }
 
 .shell { min-height: 100vh; }
 
@@ -465,6 +475,8 @@ svg text { font-family: var(--body); }
     border-color: var(--line);
     box-shadow: none;
   }
+  .frame { animation: none; background-position: 0% 50%; }
+  .frame-glow { animation: none; opacity: 0.6; }
   [style*="bladeSpin"], .backdrop svg g { animation: none !important; }
 }
 
@@ -481,10 +493,11 @@ svg text { font-family: var(--body); }
   inset: 0;
   z-index: 60;
   pointer-events: none;
-  padding: var(--frame-w, 4px);
-  background: var(--frame-gradient);
-  background-size: 340% 340%;
-  animation: frameDrift 22s linear infinite;
+  padding: var(--frame-w, 5px);
+  background: var(--frame-gradient, linear-gradient(115deg, #5fd3c4, #9d8ce0, #e3a857, #5fd3c4));
+  background-size: 400% 400%;
+  filter: saturate(1.15);
+  animation: frameDrift 20s linear infinite;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -498,8 +511,8 @@ svg text { font-family: var(--body); }
   z-index: 59;
   pointer-events: none;
   box-shadow:
-    inset 0 0 26px -8px var(--breathe-1),
-    inset 0 0 70px -34px var(--breathe-2);
+    inset 0 0 34px -10px var(--breathe-1, #5fd3c4),
+    inset 0 0 90px -40px var(--breathe-2, #9d8ce0);
   animation: frameBloom 9s ease-in-out infinite;
 }
 

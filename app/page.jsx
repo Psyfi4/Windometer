@@ -205,15 +205,11 @@ export default function Page() {
 
   return (
     <ChartThemeProvider theme={chartT}>
-      <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
-      {ambience && (
-        <>
-          <div className="frame" aria-hidden="true" />
-          <div className="frame-glow" aria-hidden="true" />
-        </>
-      )}
+      {/* The custom properties live here, above the frame as well as the
+          shell. Setting them on the shell alone left the frame — a sibling —
+          unable to resolve them, so it painted nothing. */}
       <div
-        className={`shell${ambience ? ' ambient' : ''}`}
+        className="app-root"
         style={{
           '--accent': accent,
           '--breathe-1': breathe[0],
@@ -222,7 +218,15 @@ export default function Page() {
           '--frame-gradient': frameGradient(accent),
         }}
       >
-        <main className="main">
+        <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
+        {ambience && (
+          <>
+            <div className="frame" aria-hidden="true" />
+            <div className="frame-glow" aria-hidden="true" />
+          </>
+        )}
+        <div className={`shell${ambience ? ' ambient' : ''}`}>
+          <main className="main">
           <div className="masthead">
             <h1>Wind forecasting <span className="mark">workbench</span></h1>
             <div className="sub">
@@ -284,7 +288,8 @@ export default function Page() {
               )}
             </>
           )}
-        </main>
+          </main>
+        </div>
       </div>
     </ChartThemeProvider>
   );
