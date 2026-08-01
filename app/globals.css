@@ -21,6 +21,9 @@
      interface chrome reads from this one variable. */
   --accent: #5fd3c4;
   --on-accent: #08100e;
+  --frame-w: 5px;
+  --halo-blur: 12px;
+  --halo-far-blur: 24px;
   --violet: #9d8ce0;
   --amber: #e3a857;
   --coral: #e56c73;
@@ -55,26 +58,25 @@ a { color: var(--accent); }
 
 /* ---------------- layout ---------------- */
 
-.shell { display: flex; min-height: 100vh; align-items: flex-start; }
+/* Carries the theme custom properties for everything below it, including the
+   fixed-position frame and backdrop.
 
-.sidebar {
-  width: 310px;
-  flex: 0 0 310px;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-  padding: 1.25rem 1.15rem 3rem;
-  position: sticky;
-  top: 0;
-  max-height: 100vh;
-  overflow-y: auto;
+   Do not give this element transform, filter, backdrop-filter, perspective or
+   contain: any of those would make it the containing block for its fixed
+   descendants, and the frame would scroll away with the page instead of
+   staying pinned to the window. */
+.app-root { min-height: 100vh; }
+
+.shell { min-height: 100vh; }
+
+.main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.6rem 2rem 5rem;
 }
 
-.main { flex: 1 1 auto; min-width: 0; padding: 1.5rem 2rem 5rem; }
-
 @media (max-width: 900px) {
-  .shell { flex-direction: column; }
-  .sidebar { width: 100%; flex: none; position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--line); }
-  .main { padding: 1.25rem 1rem 4rem; }
+  .main { padding: 1.1rem 1rem 4rem; }
 }
 
 /* ---------------- masthead ---------------- */
@@ -322,9 +324,14 @@ svg text { font-family: var(--body); }
 .backdrop-slide {
   position: absolute;
   inset: 0;
+  opacity: 0;
   transition: opacity 1.4s ease-in-out;
 }
+.backdrop-slide.on { opacity: 1; }
 .backdrop-slide svg { display: block; width: 100%; height: 100%; }
+
+/* Blades only turn on the scene you can see. */
+.backdrop-slide:not(.on) svg g { animation-play-state: paused; }
 
 .backdrop-photo {
   position: absolute;
@@ -333,13 +340,18 @@ svg text { font-family: var(--body); }
   background-position: center;
 }
 
-/* Readability comes first: the scene is held well back behind a scrim. */
+/* A single scrim layer. Stacking two multiplies their alphas rather than
+   averaging them, which is how an earlier version ended up 99% opaque and
+   hid the scene completely. */
 .backdrop-scrim {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(120% 80% at 50% 0%, rgba(10, 15, 20, 0.55), rgba(10, 15, 20, 0.88) 70%),
-    linear-gradient(180deg, rgba(10, 15, 20, 0.82), rgba(10, 15, 20, 0.94));
+  background: linear-gradient(
+    180deg,
+    rgba(10, 15, 20, 0.58) 0%,
+    rgba(10, 15, 20, 0.42) 40%,
+    rgba(10, 15, 20, 0.66) 100%
+  );
 }
 
 @keyframes bladeSpin {
@@ -362,7 +374,32 @@ svg text { font-family: var(--body); }
 
 @keyframes breatheGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
-  50%      { box-shadow: 0 0 16px -6px var(--breathe-2); }
+  50%      { box-shadow: 0 0 18px -5px var(--breathe-2); }
+}
+
+/* Border colour plus a matching halo. A 1px edge shifting hue is too quiet to
+   register on a dark ground; the halo is what makes it read. */
+@keyframes breatheEdge {
+  0% {
+    border-color: var(--breathe-1);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--breathe-1) 22%, transparent),
+                0 0 14px -8px var(--breathe-1);
+  }
+  33% {
+    border-color: var(--breathe-2);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--breathe-2) 30%, transparent),
+                0 0 20px -7px var(--breathe-2);
+  }
+  66% {
+    border-color: var(--breathe-3);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--breathe-3) 22%, transparent),
+                0 0 16px -8px var(--breathe-3);
+  }
+  100% {
+    border-color: var(--breathe-1);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--breathe-1) 22%, transparent),
+                0 0 14px -8px var(--breathe-1);
+  }
 }
 
 .ambient .card,
@@ -371,7 +408,7 @@ svg text { font-family: var(--body); }
 .ambient .note-box,
 .ambient .drop,
 .ambient .mapframe {
-  animation: breatheBorder 9s ease-in-out infinite;
+  animation: breatheEdge 9s ease-in-out infinite;
 }
 
 /* stagger so the edges drift out of step instead of pulsing as one block */
@@ -382,9 +419,11 @@ svg text { font-family: var(--body); }
 .ambient .tablewrap           { animation-delay: -2.2s; }
 .ambient .note-box            { animation-delay: -3.6s; }
 
-.ambient .masthead { animation: breatheBorder 9s ease-in-out infinite; }
-.ambient .sidebar  { animation: breatheBorder 11s ease-in-out infinite; }
+.ambient .masthead { animation: breatheBorder 9s ease-in-out infinite; border-bottom-width: 2px; }
+.ambient .sidebar  { animation: breatheBorder 11s ease-in-out infinite; border-right-width: 2px; }
 .ambient .btn      { animation: breatheGlow 6s ease-in-out infinite; }
+.ambient hr.sep    { animation: breatheBorder 9s ease-in-out infinite; animation-delay: -2s; }
+.ambient .tabs     { animation: breatheBorder 10s ease-in-out infinite; animation-delay: -1s; }
 
 /* ====================================================================
    Glass surfaces
@@ -415,6 +454,12 @@ svg text { font-family: var(--body); }
 .ambient thead th { background: rgba(20, 30, 39, 0.9); }
 .ambient tbody tr:hover { background: rgba(20, 30, 39, 0.75); }
 
+/* Prose on the landing screen sits directly over the scene, so it gets a
+   shadow rather than a panel — a panel there would cover the whole view. */
+.ambient .main > .masthead,
+.ambient .main > .grid-15 { text-shadow: 0 1px 10px rgba(6, 10, 14, 0.9); }
+.ambient .eyebrow { text-shadow: 0 1px 8px rgba(6, 10, 14, 0.9); }
+
 /* the main column sits above the backdrop */
 .shell { position: relative; z-index: 1; }
 
@@ -427,9 +472,225 @@ svg text { font-family: var(--body); }
   .backdrop-slide { transition: none; }
   .ambient .card, .ambient .panel, .ambient .tablewrap, .ambient .note-box,
   .ambient .drop, .ambient .mapframe, .ambient .masthead, .ambient .sidebar,
-  .ambient .btn {
+  .ambient .btn, .ambient hr.sep, .ambient .tabs {
     animation: none;
     border-color: var(--line);
+    box-shadow: none;
   }
+  .frame, .frame-halo, .frame-halo-far {
+    animation: none;
+  }
+  .frame { opacity: 1; }
+  .frame-halo { opacity: 0.5; }
+  .frame-halo-far { opacity: 0.28; }
+  .frame-glow { animation: none; opacity: 0.6; }
   [style*="bladeSpin"], .backdrop svg g { animation: none !important; }
 }
+
+
+/* ====================================================================
+   Window frame
+
+   Three stacked layers make the perimeter read as light rather than as a
+   painted band:
+
+     halo   a wide, heavily blurred sweep that bleeds inward and pulses
+     band   a crisp hairline of the same sweep, riding on top
+     bloom  an inset wash reaching further into the page
+
+   All three use a conic gradient so each edge of the window carries a
+   different part of the spectrum at the same instant; a linear gradient
+   would leave the left and right edges flat.
+   ==================================================================== */
+
+/* Registered so the sweep angle can interpolate. Without this the browser
+   treats the angle as an unanimatable token and the gradient sits still,
+   which still looks fine but does not turn. */
+@property --frame-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: true;
+}
+
+.frame-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: var(--frame-conic);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  will-change: opacity;
+}
+
+/* the soft light, well outside the hairline */
+.frame-halo {
+  z-index: 58;
+  padding: calc(var(--frame-w, 5px) * 5);
+  filter: blur(var(--halo-blur, 12px)) saturate(1.3);
+  opacity: 0.55;
+  animation:
+    frameSweep 26s linear infinite,
+    haloBreathe 7s ease-in-out infinite;
+}
+
+/* a second, wider and slower halo so the pulse never fully lands on zero */
+.frame-halo-far {
+  z-index: 57;
+  padding: calc(var(--frame-w, 5px) * 11);
+  filter: blur(var(--halo-far-blur, 24px)) saturate(1.4);
+  opacity: 0.3;
+  animation:
+    frameSweep 38s linear infinite reverse,
+    haloBreatheSlow 11s ease-in-out infinite;
+}
+
+/* the crisp edge */
+.frame {
+  z-index: 60;
+  padding: var(--frame-w, 5px);
+  filter: saturate(1.2);
+  animation:
+    frameSweep 24s linear infinite,
+    edgeBreathe 7s ease-in-out infinite;
+}
+
+/* the wash reaching into the page */
+.frame-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 40px -12px var(--breathe-1, #5fd3c4),
+    inset 0 0 110px -46px var(--breathe-2, #9d8ce0);
+  animation: frameBloom 9s ease-in-out infinite;
+}
+
+@keyframes frameSweep {
+  to { --frame-angle: 360deg; }
+}
+
+@keyframes haloBreathe {
+  0%, 100% { opacity: 0.34; }
+  50%      { opacity: 0.85; }
+}
+
+@keyframes haloBreatheSlow {
+  0%, 100% { opacity: 0.18; }
+  50%      { opacity: 0.46; }
+}
+
+@keyframes edgeBreathe {
+  0%, 100% { opacity: 0.78; }
+  50%      { opacity: 1; }
+}
+
+@keyframes frameBloom {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* Browsers without @property leave the sweep still. Drift the whole layer
+   instead so there is always some movement. */
+@supports not (background: paint(x)) {
+  .frame, .frame-halo, .frame-halo-far { background-size: 100% 100%; }
+}
+
+/* ====================================================================
+   Control deck
+   The setup that used to sit in a sidebar, laid across the top of the
+   page instead: wider rows, and it folds to a summary once a run is
+   under way so it stops competing with the results.
+   ==================================================================== */
+
+.deck {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 1.1rem 1.2rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 1.2fr;
+  gap: 1rem;
+  align-items: start;
+}
+.deck-grid.four { grid-template-columns: repeat(4, 1fr); margin-top: 1rem; }
+@media (max-width: 1000px) {
+  .deck-grid, .deck-grid.four { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .deck-grid, .deck-grid.four { grid-template-columns: 1fr; }
+}
+
+.deck .field { margin-bottom: 0; }
+
+.deck-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.deck-head .eyebrow { margin: 0; }
+
+.deck-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.deck-summary b { color: var(--ink); font-weight: 600; }
+
+.deck-actions { display: flex; gap: 0.6rem; align-items: center; }
+.deck-actions .btn { width: auto; padding: 0.55rem 1.5rem; white-space: nowrap; }
+
+/* model chips */
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+
+.chip {
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.32rem 0.75rem;
+  font-family: var(--body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.chip:hover { color: var(--ink); border-color: var(--accent); }
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.chip .dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 0.4rem; vertical-align: middle;
+}
+
+.chip-group { margin-top: 0.75rem; }
+.chip-group > .lab {
+  font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.13em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem;
+}
+
+.deck details { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: 0.8rem; }
+.deck details .deck-grid { margin-top: 0.8rem; }
+
+.dropzone-wide {
+  display: flex; align-items: center; gap: 0.9rem;
+  text-align: left; padding: 0.85rem 1rem;
+}
+.dropzone-wide .glyph {
+  font-size: 1.5rem; color: var(--accent); line-height: 1; flex: none;
+}
+.dropzone-wide .big { font-size: 0.9rem; }
