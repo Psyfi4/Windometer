@@ -52,6 +52,7 @@ function Turbine({ x, base, height, period, opacity, colour, phase }) {
       />
       <g
         style={{
+          transformBox: 'view-box',
           transformOrigin: `${x}px ${hubY}px`,
           animation: `bladeSpin ${period}s linear infinite`,
           animationDelay: `${-phase}s`,
@@ -171,10 +172,8 @@ function WindScape({ palette, seed, id }) {
 
 export default function Backdrop({ enabled = true, pinned = null }) {
   const [index, setIndex] = useState(0);
-  const [previous, setPrevious] = useState(null);
   const [photos, setPhotos] = useState({});
   const [reduced, setReduced] = useState(false);
-  const lastIndex = useRef(0);
 
   // honour the platform's reduced-motion preference
   useEffect(() => {
@@ -202,14 +201,6 @@ export default function Backdrop({ enabled = true, pinned = null }) {
     return () => { live = false; };
   }, []);
 
-  // remember the outgoing slide so it can fade out under the incoming one
-  useEffect(() => {
-    if (lastIndex.current !== index) {
-      setPrevious(lastIndex.current);
-      lastIndex.current = index;
-    }
-  }, [index]);
-
   // a pinned station holds still
   useEffect(() => {
     if (!pinned) return;
@@ -229,23 +220,22 @@ export default function Backdrop({ enabled = true, pinned = null }) {
 
   if (!enabled) return null;
 
-  const slide = (position, key) => {
-    const name = SCAPE_ORDER[position];
-    const theme = SITE_THEMES[name];
-    const photo = photos[theme.slug];
-    return (
-      <div key={key} className="backdrop-slide" style={{ opacity: key === 'current' ? 1 : 0 }}>
-        {photo
-          ? <div className="backdrop-photo" style={{ backgroundImage: `url(${photo})` }} />
-          : <WindScape palette={theme.scape} seed={position * 7919 + 13} id={theme.slug} />}
-      </div>
-    );
-  };
-
+  // Every scene stays mounted under a stable key, and only the active one is
+  // opaque. Swapping the contents of a single slide would replace the image
+  // outright with no crossfade, which is what an earlier version did.
   return (
     <div className="backdrop" aria-hidden="true">
-      {previous !== null && previous !== index && slide(previous, `prev-${previous}`)}
-      {slide(index, 'current')}
+      {SCAPE_ORDER.map((name, i) => {
+        const theme = SITE_THEMES[name];
+        const photo = photos[theme.slug];
+        return (
+          <div key={name} className={`backdrop-slide${i === index ? ' on' : ''}`}>
+            {photo
+              ? <div className="backdrop-photo" style={{ backgroundImage: `url(${photo})` }} />
+              : <WindScape palette={theme.scape} seed={i * 7919 + 13} id={theme.slug} />}
+          </div>
+        );
+      })}
       <div className="backdrop-scrim" />
     </div>
   );
