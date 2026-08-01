@@ -226,13 +226,7 @@ export default function Page() {
         }}
       >
         <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
-        {ambience && (
-          <>
-            {/* halo first, crisp edge on top of it */}
-            <div className="frame-layer frame-halo" aria-hidden="true" />
-            <div className="frame-layer frame" aria-hidden="true" />
-          </>
-        )}
+        {ambience && <div className="frame-layer frame" aria-hidden="true" />}
         <div className={`shell${ambience ? ' ambient' : ''}`}>
           <main className="main">
           <div className="masthead">
