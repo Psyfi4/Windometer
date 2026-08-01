@@ -516,7 +516,10 @@ svg text { font-family: var(--body); }
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: var(--frame-conic);
+  /* Falls back to the unrotated spectrum, so the frame still lights up even
+     if the variable never reaches it. */
+  background: var(--frame-conic,
+    conic-gradient(from var(--frame-angle, 0deg) at 50% 50%, #FFC64D 0%, #FFE08A 8.33%, #A8D96B 16.67%, #55D98D 25%, #5FD3C4 33.33%, #4FD1E8 41.67%, #6C9CC4 50%, #9D8CE0 58.33%, #C98AE0 66.67%, #FF7BB0 75%, #FF6B5B 83.33%, #FF9A4D 91.67%, #FFC64D 100%));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);

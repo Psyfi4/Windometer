@@ -21,7 +21,7 @@ import {
   BarsH, GroupedBars, MultiLine, FitScatter, BlandAltman, SignedBars,
   HistogramCurve, BandChart, PMatrix, LossCurves, WeightCurve,
 } from '@/components/Charts';
-import { themeForSite, chartTheme, PALETTE, SITE_THEMES, frameGradient, frameConic } from '@/lib/theme';
+import { themeForSite, chartTheme, PALETTE, SITE_THEMES, frameConic } from '@/lib/theme';
 import Backdrop from '@/components/Backdrop';
 import { Eyebrow, Note, Card, CardCI, CardRow, Table, Legend3 } from '@/components/ui';
 
@@ -215,7 +215,6 @@ export default function Page() {
           '--breathe-1': breathe[0],
           '--breathe-2': breathe[1],
           '--breathe-3': breathe[2],
-          '--frame-gradient': frameGradient(accent),
           '--frame-conic': frameConic(accent),
         }}
       >
