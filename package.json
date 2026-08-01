@@ -6,19 +6,14 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "start": "next start"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "^4.20.0",
-    "next": "14.2.5",
+    "@tensorflow/tfjs": "^4.22.0",
+    "next": "^14.2.35",
     "papaparse": "^5.4.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "eslint": "^8.57.0",
-    "eslint-config-next": "14.2.5"
   }
 }
