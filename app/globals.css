@@ -55,26 +55,16 @@ a { color: var(--accent); }
 
 /* ---------------- layout ---------------- */
 
-.shell { display: flex; min-height: 100vh; align-items: flex-start; }
+.shell { min-height: 100vh; }
 
-.sidebar {
-  width: 310px;
-  flex: 0 0 310px;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-  padding: 1.25rem 1.15rem 3rem;
-  position: sticky;
-  top: 0;
-  max-height: 100vh;
-  overflow-y: auto;
+.main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.6rem 2rem 5rem;
 }
 
-.main { flex: 1 1 auto; min-width: 0; padding: 1.5rem 2rem 5rem; }
-
 @media (max-width: 900px) {
-  .shell { flex-direction: column; }
-  .sidebar { width: 100%; flex: none; position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--line); }
-  .main { padding: 1.25rem 1rem 4rem; }
+  .main { padding: 1.1rem 1rem 4rem; }
 }
 
 /* ---------------- masthead ---------------- */
@@ -477,3 +467,146 @@ svg text { font-family: var(--body); }
   }
   [style*="bladeSpin"], .backdrop svg g { animation: none !important; }
 }
+
+
+/* ====================================================================
+   Window frame
+   A spectrum runs round the edge of the window and drifts through it.
+   Painted with a mask so only the border band shows; the interior is
+   punched out and stays click-through.
+   ==================================================================== */
+
+.frame {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  padding: var(--frame-w, 4px);
+  background: var(--frame-gradient);
+  background-size: 340% 340%;
+  animation: frameDrift 22s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* a soft bloom just inside the band, so the colour reaches into the page */
+.frame-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 26px -8px var(--breathe-1),
+    inset 0 0 70px -34px var(--breathe-2);
+  animation: frameBloom 9s ease-in-out infinite;
+}
+
+@keyframes frameDrift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes frameBloom {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+/* ====================================================================
+   Control deck
+   The setup that used to sit in a sidebar, laid across the top of the
+   page instead: wider rows, and it folds to a summary once a run is
+   under way so it stops competing with the results.
+   ==================================================================== */
+
+.deck {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 1.1rem 1.2rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 1.2fr;
+  gap: 1rem;
+  align-items: start;
+}
+.deck-grid.four { grid-template-columns: repeat(4, 1fr); margin-top: 1rem; }
+@media (max-width: 1000px) {
+  .deck-grid, .deck-grid.four { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .deck-grid, .deck-grid.four { grid-template-columns: 1fr; }
+}
+
+.deck .field { margin-bottom: 0; }
+
+.deck-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.deck-head .eyebrow { margin: 0; }
+
+.deck-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.deck-summary b { color: var(--ink); font-weight: 600; }
+
+.deck-actions { display: flex; gap: 0.6rem; align-items: center; }
+.deck-actions .btn { width: auto; padding: 0.55rem 1.5rem; white-space: nowrap; }
+
+/* model chips */
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+
+.chip {
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.32rem 0.75rem;
+  font-family: var(--body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.chip:hover { color: var(--ink); border-color: var(--accent); }
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.chip .dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  margin-right: 0.4rem; vertical-align: middle;
+}
+
+.chip-group { margin-top: 0.75rem; }
+.chip-group > .lab {
+  font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.13em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem;
+}
+
+.deck details { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: 0.8rem; }
+.deck details .deck-grid { margin-top: 0.8rem; }
+
+.dropzone-wide {
+  display: flex; align-items: center; gap: 0.9rem;
+  text-align: left; padding: 0.85rem 1rem;
+}
+.dropzone-wide .glyph {
+  font-size: 1.5rem; color: var(--accent); line-height: 1; flex: none;
+}
+.dropzone-wide .big { font-size: 0.9rem; }

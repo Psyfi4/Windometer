@@ -21,7 +21,7 @@ import {
   BarsH, GroupedBars, MultiLine, FitScatter, BlandAltman, SignedBars,
   HistogramCurve, BandChart, PMatrix, LossCurves, WeightCurve,
 } from '@/components/Charts';
-import { themeForSite, chartTheme, PALETTE, SITE_THEMES } from '@/lib/theme';
+import { themeForSite, chartTheme, PALETTE, SITE_THEMES, frameGradient } from '@/lib/theme';
 import Backdrop from '@/components/Backdrop';
 import { Eyebrow, Note, Card, CardCI, CardRow, Table, Legend3 } from '@/components/ui';
 
@@ -59,6 +59,7 @@ export default function Page() {
   const [dmLoss, setDmLoss] = useState('squared');
   const [chartStyle, setChartStyle] = useState('notebook');
   const [ambience, setAmbience] = useState(true);
+  const [setupOpen, setSetupOpen] = useState(true);
   const dropRef = useRef(null);
 
   const preset = MM.PRESETS[presetName];
@@ -161,7 +162,11 @@ export default function Page() {
     setProgress(null);
     setBusy(false);
     const ok = Object.keys(nextEvals);
-    if (ok.length) { setActiveModel(ok[0]); setTab(ok.length > 1 ? 'Comparison' : 'Models'); }
+    if (ok.length) {
+      setActiveModel(ok[0]);
+      setTab(ok.length > 1 ? 'Comparison' : 'Models');
+      setSetupOpen(false);   // give the results the room once there are some
+    }
   }, [features, selected, preset, topK]);
 
   /* ------------------------------ derived ---------------------------- */
@@ -186,47 +191,206 @@ export default function Page() {
   /* ------------------------------ render ----------------------------- */
   const breathe = stationTheme.breathe ?? [accent, accent, accent];
 
+  const setup = {
+    file, dataset, busy, loadError, handleFile,
+    unit, reunit, site, setSite, customLat, setCustomLat, customLon, setCustomLon,
+    stationTheme, accent, presetName, setPresetName, preset,
+    chartStyle, setChartStyle, ambience, setAmbience,
+    runAll, setRunAll, chosen, setChosen, selected,
+    testSize, setTestSize, topK, setTopK,
+    alphaMode, setAlphaMode, alphaCustom, setAlphaCustom,
+    showScaled, setShowScaled, features, run, progress,
+    setupOpen, setSetupOpen,
+  };
+
   return (
     <ChartThemeProvider theme={chartT}>
-    <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
-    <div
-      className={`shell${ambience ? ' ambient' : ''}`}
-      style={{
-        '--accent': accent,
-        '--breathe-1': breathe[0],
-        '--breathe-2': breathe[1],
-        '--breathe-3': breathe[2],
-      }}
-    >
-      <aside className="sidebar">
-        <div className="brand"><span className="glyph">◈</span><h2>Windlab</h2></div>
-        <div className="brand-note">Runs entirely in your browser</div>
+      <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
+      {ambience && (
+        <>
+          <div className="frame" aria-hidden="true" />
+          <div className="frame-glow" aria-hidden="true" />
+        </>
+      )}
+      <div
+        className={`shell${ambience ? ' ambient' : ''}`}
+        style={{
+          '--accent': accent,
+          '--breathe-1': breathe[0],
+          '--breathe-2': breathe[1],
+          '--breathe-3': breathe[2],
+          '--frame-gradient': frameGradient(accent),
+        }}
+      >
+        <main className="main">
+          <div className="masthead">
+            <h1>Wind forecasting <span className="mark">workbench</span></h1>
+            <div className="sub">
+              Upload an hourly wind record, then run any model on its own or the whole set.
+              Error metrics with bootstrap intervals, Diebold-Mariano tests, tail behaviour
+              and Weibull power density at hub height, all computed from your own data —
+              in this tab, with nothing sent to a server.
+            </div>
+          </div>
 
-        <div
-          ref={dropRef}
-          className="drop"
-          onClick={() => document.getElementById('fileInput').click()}
-          onDragOver={(e) => { e.preventDefault(); dropRef.current?.classList.add('over'); }}
-          onDragLeave={() => dropRef.current?.classList.remove('over')}
-          onDrop={(e) => {
-            e.preventDefault();
-            dropRef.current?.classList.remove('over');
-            handleFile(e.dataTransfer.files?.[0]);
-          }}
-        >
-          <div className="big">{file ? file.name : 'Drop a wind dataset'}</div>
-          <div className="small">
-            {file
-              ? `${dataset ? fmtInt(dataset.summary.nHours) + ' hours' : 'reading…'} · click to replace`
-              : 'xlsx, xls or csv — click to browse'}
+          <Deck {...setup} />
+
+          {!dataset ? (
+            <Landing />
+          ) : (
+            <>
+              <div className="tabs">
+                {TABS.map((t) => (
+                  <button key={t} className={`tab ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{t}</button>
+                ))}
+              </div>
+
+              {failures.length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <Note tone="coral">
+                    {failures.length === 1 ? 'One model did not finish' : `${failures.length} models did not finish`}:{' '}
+                    {failures.map((f) => `${f.name} (${f.error})`).join('; ')}
+                  </Note>
+                </div>
+              )}
+
+              {tab === 'Dataset' && <DatasetTab dataset={dataset} weibull={weibull} />}
+              {tab === 'Models' && (
+                <ModelsTab
+                  results={results} evals={evals} features={features}
+                  activeModel={activeModel} setActiveModel={setActiveModel}
+                  showScaled={showScaled}
+                />
+              )}
+              {tab === 'Comparison' && (
+                <ComparisonTab
+                  results={results} evals={evals} board={board} features={features}
+                  showScaled={showScaled} site={site} dmLoss={dmLoss} setDmLoss={setDmLoss}
+                />
+              )}
+              {tab === 'Weibull & power' && (
+                <WeibullTab
+                  weibull={weibull} dataset={dataset} site={site}
+                  results={results} features={features} bestModel={bestModel}
+                />
+              )}
+              {tab === 'Region' && <RegionTab site={site} lat={lat} lon={lon} />}
+              {tab === 'Export' && (
+                <ExportTab
+                  board={board} results={results} evals={evals} features={features}
+                  weibull={weibull} dataset={dataset} file={file} preset={preset}
+                  presetName={presetName} testSize={testSize} unit={unit} site={site}
+                />
+              )}
+            </>
+          )}
+        </main>
+      </div>
+    </ChartThemeProvider>
+  );
+}
+
+/* ==================================================================== *
+ * Control deck
+ *
+ * Everything that used to live in a sidebar. Across the top instead: the
+ * controls get room to breathe, and once a run has produced results the
+ * whole thing folds to a one-line summary so it stops taking the space
+ * the charts want.
+ * ==================================================================== */
+
+function Deck(props) {
+  const {
+    file, dataset, busy, loadError, handleFile,
+    unit, reunit, site, setSite, customLat, setCustomLat, customLon, setCustomLon,
+    stationTheme, accent, presetName, setPresetName, preset,
+    chartStyle, setChartStyle, ambience, setAmbience,
+    runAll, setRunAll, chosen, setChosen, selected,
+    testSize, setTestSize, topK, setTopK,
+    alphaMode, setAlphaMode, alphaCustom, setAlphaCustom,
+    showScaled, setShowScaled, features, run, progress,
+    setupOpen, setSetupOpen,
+  } = props;
+
+  const dropRef = useRef(null);
+  const toggle = (name) => setChosen(
+    chosen.includes(name) ? chosen.filter((c) => c !== name) : [...chosen, name]
+  );
+
+  /* ---- folded: one line of what is set, and a way back in ---- */
+  if (!setupOpen) {
+    return (
+      <div className="deck">
+        <div className="deck-head" style={{ marginBottom: 0 }}>
+          <div className="deck-summary">
+            <span className="swatch" style={{ background: accent, width: 11, height: 11 }} />
+            <b>{file?.name ?? 'No file'}</b>
+            <span className="pill">{site === 'auto' ? 'Custom site' : site}</span>
+            <span className="pill">{presetName}</span>
+            <span className="pill">{selected.length} model{selected.length === 1 ? '' : 's'}</span>
+            <span className="pill">{chartStyle === 'notebook' ? 'Notebook charts' : 'Dark charts'}</span>
+          </div>
+          <div className="deck-actions">
+            <button className="btn-ghost" onClick={() => setSetupOpen(true)}>Edit setup</button>
+            <button className="btn" disabled={!features || busy || !selected.length} onClick={run}>
+              {busy ? 'Working…' : 'Run again'}
+            </button>
           </div>
         </div>
-        <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv"
-          style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files?.[0])} />
+        {progress && <Progress progress={progress} />}
+      </div>
+    );
+  }
 
-        {loadError && <div className="note-box coral" style={{ marginTop: '0.7rem' }}>{loadError}</div>}
+  /* ---- open ---- */
+  return (
+    <div className="deck">
+      <div className="deck-head">
+        <div className="eyebrow">Setup</div>
+        <div className="deck-actions">
+          {dataset && (
+            <button className="btn-ghost" onClick={() => setSetupOpen(false)}>Collapse</button>
+          )}
+          <button className="btn" disabled={!features || busy || !selected.length} onClick={run}>
+            {busy ? 'Working…' : 'Run analysis'}
+          </button>
+        </div>
+      </div>
 
-        <div className="field" style={{ marginTop: '1rem' }}>
+      <div className="deck-grid">
+        {/* file */}
+        <div>
+          <div
+            ref={dropRef}
+            className="drop dropzone-wide"
+            onClick={() => document.getElementById('fileInput').click()}
+            onDragOver={(e) => { e.preventDefault(); dropRef.current?.classList.add('over'); }}
+            onDragLeave={() => dropRef.current?.classList.remove('over')}
+            onDrop={(e) => {
+              e.preventDefault();
+              dropRef.current?.classList.remove('over');
+              handleFile(e.dataTransfer.files?.[0]);
+            }}
+          >
+            <span className="glyph">◈</span>
+            <span>
+              <span className="big">{file ? file.name : 'Drop a wind dataset'}</span>
+              <span className="small" style={{ display: 'block' }}>
+                {file
+                  ? `${dataset ? fmtInt(dataset.summary.nHours) + ' hours read' : 'reading…'} · click to replace`
+                  : 'xlsx, xls or csv — or click to browse'}
+              </span>
+            </span>
+          </div>
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv,.txt,.tsv"
+            style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files?.[0])} />
+          {loadError && (
+            <div className="note-box coral" style={{ marginTop: '0.6rem' }}>{loadError}</div>
+          )}
+        </div>
+
+        {/* units */}
+        <div className="field">
           <label>Recorded in</label>
           <div className="seg">
             {[['kmh', 'km/h'], ['ms', 'm/s']].map(([v, l]) => (
@@ -235,37 +399,29 @@ export default function Page() {
           </div>
         </div>
 
-        <hr className="sep" />
-
+        {/* station */}
         <div className="field">
           <label>Station</label>
           <select value={site} onChange={(e) => setSite(e.target.value)}>
             <option value="auto">Not listed / custom</option>
-            {Object.keys(SITES.SITES).map((n) => <option key={n} value={n}>{n}</option>)}
+            {Object.keys(SITE_THEMES).map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
-        </div>
-        <div className="caption" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', margin: '-0.5rem 0 0.9rem' }}>
-          <span className="swatch" style={{ background: accent, width: 11, height: 11 }} />
-          <span>{stationTheme.name} — {stationTheme.reason}</span>
-        </div>
-
-        {site === 'auto' && (
-          <div className="field" style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ flex: 1 }}>
-              <label>Latitude</label>
-              <input type="number" step="0.0001" value={customLat}
+          <div className="caption" style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.4rem' }}>
+            <span className="swatch" style={{ background: accent, width: 10, height: 10 }} />
+            <span>{stationTheme.name} — {stationTheme.reason}</span>
+          </div>
+          {site === 'auto' && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <input type="number" step="0.0001" value={customLat} aria-label="Latitude"
                 onChange={(e) => setCustomLat(parseFloat(e.target.value) || 0)} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label>Longitude</label>
-              <input type="number" step="0.0001" value={customLon}
+              <input type="number" step="0.0001" value={customLon} aria-label="Longitude"
                 onChange={(e) => setCustomLon(parseFloat(e.target.value) || 0)} />
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      </div>
 
-        <hr className="sep" />
-
+      <div className="deck-grid four">
         <div className="field">
           <label>Training effort</label>
           <div className="seg">
@@ -285,8 +441,8 @@ export default function Page() {
           </div>
           <div className="caption">
             {chartStyle === 'notebook'
-              ? "matplotlib defaults — the look the Colab notebooks produce."
-              : `Dark panels following the ${stationTheme.name.toLowerCase()} station accent.`}
+              ? 'matplotlib defaults — the Colab look.'
+              : `Dark panels on the ${stationTheme.name.toLowerCase()} accent.`}
           </div>
         </div>
 
@@ -299,40 +455,64 @@ export default function Page() {
           </div>
           <div className="caption">
             {ambience
-              ? (site === 'auto'
-                ? 'Turbine scenes cycle through the six stations; borders drift with the accent.'
-                : `Pinned to the ${site} scene. Choose “Not listed” to cycle all six.`)
+              ? (site === 'auto' ? 'Scenes cycle all six stations.' : `Pinned to ${site}.`)
               : 'Plain background, still borders.'}
           </div>
         </div>
 
-        <label className="checkline">
-          <input type="checkbox" checked={runAll} onChange={(e) => setRunAll(e.target.checked)} />
-          <span>Run every model</span>
-        </label>
-
-        {!runAll && (
-          <>
-            <div className="eyebrow" style={{ marginTop: '0.9rem' }}>Base models</div>
-            {MM.BASE_MODELS.map((n) => (
-              <ModelCheck key={n} name={n} chosen={chosen} setChosen={setChosen} />
+        <div className="field">
+          <label>Selection</label>
+          <div className="seg">
+            {[[true, 'Every model'], [false, 'Pick']].map(([v, l]) => (
+              <button key={l} className={runAll === v ? 'on' : ''} onClick={() => setRunAll(v)}>{l}</button>
             ))}
-            <div className="eyebrow">Hybrid models</div>
-            {MM.HYBRID_MODELS.map((n) => (
-              <ModelCheck key={n} name={n} chosen={chosen} setChosen={setChosen} />
-            ))}
-          </>
-        )}
+          </div>
+          <div className="caption">
+            {runAll ? `All ${selected.length} will run.` : `${chosen.length} selected.`}
+          </div>
+        </div>
+      </div>
 
-        <details>
-          <summary>Advanced</summary>
-          <div className="field" style={{ marginTop: '0.7rem' }}>
-            <label>Test share (chronological) — {(testSize * 100).toFixed(0)}%</label>
+      {!runAll && (
+        <>
+          <div className="chip-group">
+            <div className="lab">Base models</div>
+            <div className="chips">
+              {MM.BASE_MODELS.map((n) => (
+                <button key={n} title={MM.REGISTRY[n].blurb}
+                  className={`chip${chosen.includes(n) ? ' on' : ''}`} onClick={() => toggle(n)}>
+                  <span className="dot" style={{ background: FAMILY_COLOUR[MM.REGISTRY[n].family] }} />
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="chip-group">
+            <div className="lab">Hybrid models</div>
+            <div className="chips">
+              {MM.HYBRID_MODELS.map((n) => (
+                <button key={n} title={MM.REGISTRY[n].blurb}
+                  className={`chip${chosen.includes(n) ? ' on' : ''}`} onClick={() => toggle(n)}>
+                  <span className="dot" style={{ background: FAMILY_COLOUR[MM.REGISTRY[n].family] }} />
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      <details>
+        <summary>Advanced</summary>
+        <div className="deck-grid four">
+          <div className="field">
+            <label>Test share — {(testSize * 100).toFixed(0)}%</label>
             <input type="range" min="0.1" max="0.4" step="0.05" value={testSize}
               onChange={(e) => setTestSize(parseFloat(e.target.value))} />
+            <div className="caption">Chronological, latest data held out.</div>
           </div>
           <div className="field">
-            <label>Lags kept by the RF selectors — {topK}</label>
+            <label>Lags kept by RF selectors — {topK}</label>
             <input type="range" min="4" max="24" step="2" value={topK}
               onChange={(e) => setTopK(parseInt(e.target.value, 10))} />
           </div>
@@ -343,102 +523,38 @@ export default function Page() {
               <option value="computed">Computed from Eq. 6</option>
               <option value="custom">Custom</option>
             </select>
-          </div>
-          {alphaMode === 'custom' && (
-            <div className="field">
-              <label>α = {alphaCustom.toFixed(2)}</label>
+            {alphaMode === 'custom' && (
               <input type="range" min="0.05" max="0.4" step="0.01" value={alphaCustom}
+                style={{ marginTop: '0.5rem' }}
                 onChange={(e) => setAlphaCustom(parseFloat(e.target.value))} />
-            </div>
-          )}
-          <label className="checkline">
-            <input type="checkbox" checked={showScaled} onChange={(e) => setShowScaled(e.target.checked)} />
-            <span>Show metrics on the min-max scaled target</span>
-          </label>
-        </details>
-
-        <hr className="sep" />
-        <button className="btn" disabled={!features || busy || !selected.length} onClick={run}>
-          {busy ? 'Working…' : 'Run analysis'}
-        </button>
-
-        {progress && (
-          <div style={{ marginTop: '0.8rem' }}>
-            <div className="prog">
-              <div style={{ width: `${((progress.index + progress.fraction) / progress.total) * 100}%` }} />
-            </div>
-            <div className="prog-label">
-              {progress.name} ({progress.index + 1}/{progress.total}) · {progress.message}
-            </div>
+            )}
           </div>
-        )}
-      </aside>
-
-      <main className="main">
-        <div className="masthead">
-          <h1>Wind forecasting <span className="mark">workbench</span></h1>
-          <div className="sub">
-            Upload an hourly wind record, then run any model on its own or the whole set.
-            Error metrics with bootstrap intervals, Diebold-Mariano tests, tail behaviour
-            and Weibull power density at hub height, all computed from your own data —
-            in this tab, with nothing sent to a server.
+          <div className="field">
+            <label>Metric space</label>
+            <label className="checkline">
+              <input type="checkbox" checked={showScaled} onChange={(e) => setShowScaled(e.target.checked)} />
+              <span>Show min-max scaled metrics</span>
+            </label>
+            <div className="caption">Lets you compare with the published Table 1.</div>
           </div>
         </div>
+      </details>
 
-        {!dataset ? (
-          <Landing />
-        ) : (
-          <>
-            <div className="tabs">
-              {TABS.map((t) => (
-                <button key={t} className={`tab ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{t}</button>
-              ))}
-            </div>
-
-            {failures.length > 0 && (
-              <div style={{ marginBottom: '1rem' }}>
-                <Note tone="coral">
-                  {failures.length === 1 ? 'One model did not finish' : `${failures.length} models did not finish`}:{' '}
-                  {failures.map((f) => `${f.name} (${f.error})`).join('; ')}
-                </Note>
-              </div>
-            )}
-
-            {tab === 'Dataset' && <DatasetTab dataset={dataset} weibull={weibull} />}
-            {tab === 'Models' && (
-              <ModelsTab
-                results={results} evals={evals} features={features}
-                activeModel={activeModel} setActiveModel={setActiveModel}
-                showScaled={showScaled}
-              />
-            )}
-            {tab === 'Comparison' && (
-              <ComparisonTab
-                results={results} evals={evals} board={board} features={features}
-                showScaled={showScaled} site={site} dmLoss={dmLoss} setDmLoss={setDmLoss}
-              />
-            )}
-            {tab === 'Weibull & power' && (
-              <WeibullTab
-                weibull={weibull} dataset={dataset} site={site}
-                results={results} features={features} bestModel={bestModel}
-              />
-            )}
-            {tab === 'Region' && (
-              <RegionTab site={site} lat={lat} lon={lon} />
-            )}
-            {tab === 'Export' && (
-              <ExportTab
-                board={board} results={results} evals={evals} features={features}
-                weibull={weibull} dataset={dataset} file={file} preset={preset}
-                presetName={presetName} testSize={testSize} unit={unit} site={site}
-              />
-            )}
-          </>
-        )}
-      </main>
+      {progress && <Progress progress={progress} />}
     </div>
-    </ChartThemeProvider>
+  );
+}
+
+function Progress({ progress }) {
+  return (
+    <div style={{ marginTop: '1rem' }}>
+      <div className="prog">
+        <div style={{ width: `${((progress.index + progress.fraction) / progress.total) * 100}%` }} />
+      </div>
+      <div className="prog-label">
+        {progress.name} ({progress.index + 1}/{progress.total}) · {progress.message}
+      </div>
+    </div>
   );
 }
 
