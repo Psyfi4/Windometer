@@ -22,6 +22,7 @@ import {
   HistogramCurve, BandChart, PMatrix, LossCurves, WeightCurve,
 } from '@/components/Charts';
 import { themeForSite, chartTheme, PALETTE, SITE_THEMES } from '@/lib/theme';
+import Backdrop from '@/components/Backdrop';
 import { Eyebrow, Note, Card, CardCI, CardRow, Table, Legend3 } from '@/components/ui';
 
 const HUB_HEIGHTS = [100, 120, 150];
@@ -57,6 +58,7 @@ export default function Page() {
   const [activeModel, setActiveModel] = useState(null);
   const [dmLoss, setDmLoss] = useState('squared');
   const [chartStyle, setChartStyle] = useState('notebook');
+  const [ambience, setAmbience] = useState(true);
   const dropRef = useRef(null);
 
   const preset = MM.PRESETS[presetName];
@@ -182,9 +184,20 @@ export default function Page() {
   const lon = siteMeta ? siteMeta.lon : customLon;
 
   /* ------------------------------ render ----------------------------- */
+  const breathe = stationTheme.breathe ?? [accent, accent, accent];
+
   return (
     <ChartThemeProvider theme={chartT}>
-    <div className="shell" style={{ '--accent': accent }}>
+    <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
+    <div
+      className={`shell${ambience ? ' ambient' : ''}`}
+      style={{
+        '--accent': accent,
+        '--breathe-1': breathe[0],
+        '--breathe-2': breathe[1],
+        '--breathe-3': breathe[2],
+      }}
+    >
       <aside className="sidebar">
         <div className="brand"><span className="glyph">◈</span><h2>Windlab</h2></div>
         <div className="brand-note">Runs entirely in your browser</div>
@@ -274,6 +287,22 @@ export default function Page() {
             {chartStyle === 'notebook'
               ? "matplotlib defaults — the look the Colab notebooks produce."
               : `Dark panels following the ${stationTheme.name.toLowerCase()} station accent.`}
+          </div>
+        </div>
+
+        <div className="field">
+          <label>Ambience</label>
+          <div className="seg">
+            {[[true, 'On'], [false, 'Off']].map(([v, l]) => (
+              <button key={l} className={ambience === v ? 'on' : ''} onClick={() => setAmbience(v)}>{l}</button>
+            ))}
+          </div>
+          <div className="caption">
+            {ambience
+              ? (site === 'auto'
+                ? 'Turbine scenes cycle through the six stations; borders drift with the accent.'
+                : `Pinned to the ${site} scene. Choose “Not listed” to cycle all six.`)
+              : 'Plain background, still borders.'}
           </div>
         </div>
 
