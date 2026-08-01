@@ -461,31 +461,20 @@ svg text { font-family: var(--body); }
 /* the main column sits above the backdrop */
 .shell { position: relative; z-index: 1; }
 
-/* ====================================================================
-   Reduced motion
-   Nothing animates, nothing cycles, and the borders settle on the accent.
-   ==================================================================== */
 
-@media (prefers-reduced-motion: reduce) {
-  .backdrop-slide { transition: none; }
-  .ambient .card, .ambient .panel, .ambient .tablewrap, .ambient .note-box,
-  .ambient .drop, .ambient .mapframe, .ambient .masthead, .ambient .sidebar,
-  .ambient .btn, .ambient hr.sep, .ambient .tabs {
-    animation: none;
-    border-color: var(--line);
-    box-shadow: none;
-  }
-  .frame { animation: none; opacity: 1; }
-  [style*="bladeSpin"], .backdrop svg g { animation: none !important; }
-}
 
 
 /* ====================================================================
    Window frame
 
-   A single crisp band of colour runs round the window, sweeping through the
-   spectrum and pulsing gently. No blur: the band stops at its own edge
-   rather than bleeding into the page.
+   A single crisp band of colour runs round the window. Three motions run at
+   once on different clocks, so the combination almost never repeats:
+
+     sweep    the conic gradient turns, 18s
+     hue      every colour in it rotates through the wheel, 11s
+     breathe  the whole band pulses in brightness, 5s
+
+   No blur: the band stops at its own edge rather than bleeding into the page.
 
    It uses a conic gradient so each edge of the window carries a different
    part of the spectrum at the same instant; a linear gradient would leave
@@ -508,7 +497,7 @@ svg text { font-family: var(--body); }
   /* Falls back to the unrotated spectrum, so the frame still lights up even
      if the variable never reaches it. */
   background: var(--frame-conic,
-    conic-gradient(from var(--frame-angle, 0deg) at 50% 50%, #FFC64D 0%, #FFE08A 8.33%, #A8D96B 16.67%, #55D98D 25%, #5FD3C4 33.33%, #4FD1E8 41.67%, #6C9CC4 50%, #9D8CE0 58.33%, #C98AE0 66.67%, #FF7BB0 75%, #FF6B5B 83.33%, #FF9A4D 91.67%, #FFC64D 100%));
+    conic-gradient(from var(--frame-angle, 0deg) at 50% 50%, #FFB300 0.00%, #FFE93D 8.33%, #A3E635 16.67%, #22E67A 25.00%, #16E0C4 33.33%, #22D3EE 41.67%, #3B82F6 50.00%, #8B5CF6 58.33%, #D926E8 66.67%, #FF4D9D 75.00%, #FF3B30 83.33%, #FF7A18 91.67%, #FFB300 100.00%));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -520,18 +509,27 @@ svg text { font-family: var(--body); }
 .frame {
   z-index: 60;
   padding: var(--frame-w, 5px);
-  filter: saturate(1.2);
+  /* filter carries the hue cycle, so it cannot also be set statically here */
   animation:
-    frameSweep 24s linear infinite,
-    edgeBreathe 7s ease-in-out infinite;
+    frameSweep 18s linear infinite,
+    frameHue 11s linear infinite,
+    edgeBreathe 5s ease-in-out infinite;
 }
 
 @keyframes frameSweep {
   to { --frame-angle: 360deg; }
 }
 
+/* Rotating the hue on top of the sweep means the band is never twice the
+   same colour in the same place. Saturation and brightness are folded into
+   the same keyframe because a single element has only one filter property. */
+@keyframes frameHue {
+  from { filter: saturate(1.9) brightness(1.12) hue-rotate(0deg); }
+  to   { filter: saturate(1.9) brightness(1.12) hue-rotate(360deg); }
+}
+
 @keyframes edgeBreathe {
-  0%, 100% { opacity: 0.78; }
+  0%, 100% { opacity: 0.72; }
   50%      { opacity: 1; }
 }
 
@@ -637,3 +635,26 @@ svg text { font-family: var(--body); }
   font-size: 1.5rem; color: var(--accent); line-height: 1; flex: none;
 }
 .dropzone-wide .big { font-size: 0.9rem; }
+
+
+/* ====================================================================
+   Reduced motion
+
+   Last in the file on purpose. These rules have the same specificity as
+   the ones they override, so they only win by coming after them. Moved
+   up the file and the frame would keep spinning for anyone who has asked
+   the platform for less motion.
+   ==================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop-slide { transition: none; }
+  .ambient .card, .ambient .panel, .ambient .tablewrap, .ambient .note-box,
+  .ambient .drop, .ambient .mapframe, .ambient .masthead, .ambient .sidebar,
+  .ambient .btn, .ambient hr.sep, .ambient .tabs {
+    animation: none;
+    border-color: var(--line);
+    box-shadow: none;
+  }
+  .frame { animation: none; opacity: 1; filter: saturate(1.9) brightness(1.12); }
+  [style*="bladeSpin"], .backdrop svg g { animation: none !important; }
+}
