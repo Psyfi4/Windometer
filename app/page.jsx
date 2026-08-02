@@ -74,7 +74,6 @@ export default function Page() {
   const [setupOpen, setSetupOpen] = useState(true);
   const [prefersReduced, setPrefersReduced] = useState(false);
   const [forceMotion, setForceMotion] = useState(false);
-  const dropRef = useRef(null);
 
   const preset = MM.PRESETS[presetName];
   const stationTheme = themeForSite(site);
@@ -745,23 +744,6 @@ function capBlock(block, cap) {
   return { X, y, times, nRows: cap, nCols: block.nCols };
 }
 
-function ModelCheck({ name, chosen, setChosen }) {
-  const spec = MM.REGISTRY[name];
-  const on = chosen.includes(name);
-  return (
-    <label className="checkline" title={spec.blurb}>
-      <input
-        type="checkbox" checked={on}
-        onChange={() => setChosen(on ? chosen.filter((c) => c !== name) : [...chosen, name])}
-      />
-      <span>
-        {name}
-        {spec.needsTF && <span className="pill" style={{ marginLeft: '0.35rem' }}>slower</span>}
-      </span>
-    </label>
-  );
-}
-
 /* ==================================================================== *
  * Dataset
  * ==================================================================== */
@@ -845,7 +827,7 @@ function DatasetTab({ dataset, weibull }) {
 function ModelsTab({ results, evals, features, activeModel, setActiveModel, showScaled }) {
   const names = Object.keys(evals);
   if (!names.length) {
-    return <div className="empty">Choose models on the left and press <b>Run analysis</b>.</div>;
+    return <div className="empty">Pick models in the setup deck above and press <b>Run analysis</b>.</div>;
   }
   const pick = names.includes(activeModel) ? activeModel : names[0];
   const res = results[pick];
