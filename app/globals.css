@@ -640,21 +640,41 @@ svg text { font-family: var(--body); }
 /* ====================================================================
    Reduced motion
 
-   Last in the file on purpose. These rules have the same specificity as
-   the ones they override, so they only win by coming after them. Moved
-   up the file and the frame would keep spinning for anyone who has asked
-   the platform for less motion.
+   Last in the file on purpose. These rules have the same specificity as the
+   ones they override, so they only win by coming after them.
+
+   Everything here yields to [data-motion="on"], which the page sets only when
+   someone has explicitly asked for motion despite the platform preference.
+   The preference is honoured by default — it exists for vestibular disorders
+   and migraine, not as a style choice — but on your own machine you can say
+   otherwise, and the interface tells you when it has stepped in.
    ==================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
-  .backdrop-slide { transition: none; }
-  .ambient .card, .ambient .panel, .ambient .tablewrap, .ambient .note-box,
-  .ambient .drop, .ambient .mapframe, .ambient .masthead, .ambient .sidebar,
-  .ambient .btn, .ambient hr.sep, .ambient .tabs {
+  .app-root:not([data-motion='on']) .backdrop-slide { transition: none; }
+
+  .app-root:not([data-motion='on']) .ambient .card,
+  .app-root:not([data-motion='on']) .ambient .panel,
+  .app-root:not([data-motion='on']) .ambient .tablewrap,
+  .app-root:not([data-motion='on']) .ambient .note-box,
+  .app-root:not([data-motion='on']) .ambient .drop,
+  .app-root:not([data-motion='on']) .ambient .mapframe,
+  .app-root:not([data-motion='on']) .ambient .masthead,
+  .app-root:not([data-motion='on']) .ambient .btn,
+  .app-root:not([data-motion='on']) .ambient hr.sep,
+  .app-root:not([data-motion='on']) .ambient .tabs {
     animation: none;
     border-color: var(--line);
     box-shadow: none;
   }
-  .frame { animation: none; opacity: 1; filter: saturate(1.9) brightness(1.12); }
-  [style*="bladeSpin"], .backdrop svg g { animation: none !important; }
+
+  .app-root:not([data-motion='on']) .frame {
+    animation: none;
+    opacity: 1;
+    filter: saturate(1.9) brightness(1.12);
+  }
+
+  .app-root:not([data-motion='on']) .backdrop svg g {
+    animation-play-state: paused;
+  }
 }

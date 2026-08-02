@@ -8,7 +8,7 @@
  * and no data leaves the machine. That is what lets it live on a static host.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import * as D from '@/lib/data';
 import * as S from '@/lib/stats';
@@ -65,6 +65,8 @@ export default function Page() {
   const [chartStyle, setChartStyle] = useState('notebook');
   const [ambience, setAmbience] = useState(true);
   const [setupOpen, setSetupOpen] = useState(true);
+  const [prefersReduced, setPrefersReduced] = useState(false);
+  const [forceMotion, setForceMotion] = useState(false);
   const dropRef = useRef(null);
 
   const preset = MM.PRESETS[presetName];
@@ -113,6 +115,16 @@ export default function Page() {
     setResults({});
     setEvals({});
   }, [dataset, unit]);
+
+  // The platform can ask for less motion. Honour it, but say so, because
+  // otherwise the ambient effects look simply broken.
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReduced(mq.matches);
+    const onChange = (e) => setPrefersReduced(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   /* ------------------------------ features --------------------------- */
   const features = useMemo(() => {
@@ -205,7 +217,7 @@ export default function Page() {
     testSize, setTestSize, topK, setTopK,
     alphaMode, setAlphaMode, alphaCustom, setAlphaCustom,
     showScaled, setShowScaled, features, run, progress,
-    setupOpen, setSetupOpen,
+    setupOpen, setSetupOpen, prefersReduced, forceMotion, setForceMotion,
   };
 
   return (
@@ -215,6 +227,7 @@ export default function Page() {
           unable to resolve them, so it painted nothing. */}
       <div
         className="app-root"
+        data-motion={forceMotion ? 'on' : undefined}
         style={{
           '--accent': accent,
           '--breathe-1': breathe[0],
@@ -225,7 +238,7 @@ export default function Page() {
             : undefined,
         }}
       >
-        <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} />
+        <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} forceMotion={forceMotion} />
         {ambience && <div className="frame-layer frame" aria-hidden="true" />}
         <div className={`shell${ambience ? ' ambient' : ''}`}>
           <main className="main">
@@ -316,7 +329,7 @@ function Deck(props) {
     testSize, setTestSize, topK, setTopK,
     alphaMode, setAlphaMode, alphaCustom, setAlphaCustom,
     showScaled, setShowScaled, features, run, progress,
-    setupOpen, setSetupOpen,
+    setupOpen, setSetupOpen, prefersReduced, forceMotion, setForceMotion,
   } = props;
 
   const dropRef = useRef(null);
@@ -465,6 +478,31 @@ function Deck(props) {
               ? (site === 'auto' ? 'Scenes cycle all six stations.' : `Pinned to ${site}.`)
               : 'Plain background, still borders.'}
           </div>
+          {ambience && prefersReduced && !forceMotion && (
+            <div className="caption" style={{ marginTop: '0.45rem' }}>
+              <span style={{ color: 'var(--amber)' }}>Motion is paused.</span>{' '}
+              Your system asks for reduced motion, so the frame and scenes hold still.{' '}
+              <button
+                className="btn-ghost"
+                style={{ padding: '0.18rem 0.5rem', fontSize: '0.74rem', marginTop: '0.3rem' }}
+                onClick={() => setForceMotion(true)}
+              >
+                Animate anyway
+              </button>
+            </div>
+          )}
+          {ambience && prefersReduced && forceMotion && (
+            <div className="caption" style={{ marginTop: '0.45rem' }}>
+              Overriding the system motion preference.{' '}
+              <button
+                className="btn-ghost"
+                style={{ padding: '0.18rem 0.5rem', fontSize: '0.74rem', marginTop: '0.3rem' }}
+                onClick={() => setForceMotion(false)}
+              >
+                Respect it again
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="field">
