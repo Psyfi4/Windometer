@@ -226,7 +226,7 @@ export default function Page() {
           shell. Setting them on the shell alone left the frame — a sibling —
           unable to resolve them, so it painted nothing. */}
       <div
-        className="app-root"
+        className={`app-root${!dataset ? ' landing' : ''}`}
         data-motion={forceMotion ? 'on' : undefined}
         style={{
           '--accent': accent,
@@ -239,7 +239,14 @@ export default function Page() {
         }}
       >
         <Backdrop enabled={ambience} pinned={site !== 'auto' ? site : null} forceMotion={forceMotion} />
-        {ambience && <div className="frame-layer frame" aria-hidden="true" />}
+        {ambience && (
+          <>
+            <div className="grade" aria-hidden="true" />
+            <div className="vignette" aria-hidden="true" />
+            <div className="grain" aria-hidden="true" />
+            <div className="frame-layer frame" aria-hidden="true" />
+          </>
+        )}
         <div className={`shell${ambience ? ' ambient' : ''}`}>
           <main className="main">
           <div className="masthead">
@@ -638,49 +645,78 @@ function ModelCheck({ name, chosen, setChosen }) {
 
 function Landing() {
   return (
-    <div className="grid-15">
-      <div>
-        <Eyebrow>Getting started</Eyebrow>
-        <p style={{ color: 'var(--muted)', fontSize: '0.88rem', lineHeight: 1.7 }}>
-          Drop a file into the panel on the left. Two layouts are recognised without
-          any configuration:
+    <>
+      <section className="panel-full">
+        <h2>Drop a record<br />and start.</h2>
+        <p className="lede">
+          Two layouts are recognised without any configuration. Everything after
+          that happens in this tab — the file is read locally, the models train
+          on your machine, and nothing is sent anywhere.
         </p>
-        <p style={{ fontSize: '0.86rem', lineHeight: 1.7 }}>
-          <b>IMD station format</b> — one row per day, with <code>YEAR</code>, <code>MN</code>,{' '}
-          <code>DT</code> and 24 hourly columns <code>S01</code>…<code>S24</code>.<br />
-          <b>Generic format</b> — one row per reading, with a timestamp column
-          (<code>datetime</code>, <code>timestamp</code>, <code>date</code>) and a wind-speed
-          column (<code>wind_speed</code>, <code>ws</code>, <code>speed</code>).
-        </p>
-        <Eyebrow>What gets computed</Eyebrow>
-        <ul style={{ color: 'var(--muted)', fontSize: '0.85rem', lineHeight: 1.85, paddingLeft: '1.1rem' }}>
-          <li>Gap handling: linear interpolation under 6 h, monthly median beyond</li>
-          <li>24 strictly causal lag features forecasting one hour ahead</li>
-          <li>Chronological train/test split — no shuffling, no lookahead</li>
-          <li>RMSE, MAE, R², MAPE with 95% moving-block bootstrap intervals</li>
-          <li>Pairwise Diebold-Mariano tests with a Newey-West correction</li>
-          <li>P95 tail errors, exceedance recall, Bland-Altman agreement</li>
-          <li>Weibull <i>k</i> and <i>s</i> by the MEPF method, power density at 100/120/150 m</li>
-        </ul>
-      </div>
-      <div>
-        <Eyebrow>Model library</Eyebrow>
-        {[['Base', MM.BASE_MODELS], ['Hybrid', MM.HYBRID_MODELS]].map(([group, names]) => (
-          <div key={group} style={{ marginBottom: '1rem' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem' }}>{group}</div>
-            {names.map((n) => (
-              <div key={n} style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '0.25rem 0', lineHeight: 1.45 }}>
-                <span style={{ color: FAMILY_COLOUR[MM.REGISTRY[n].family] }}>·</span> {n}
-              </div>
-            ))}
+        <div className="grid2" style={{ marginTop: '2rem' }}>
+          <div className="panel">
+            <div className="eyebrow" style={{ marginTop: 0 }}>IMD station format</div>
+            <p style={{ fontSize: '0.86rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>
+              One row per day, with <code>YEAR</code>, <code>MN</code>, <code>DT</code>{' '}
+              and 24 hourly columns <code>S01</code>…<code>S24</code>.
+            </p>
           </div>
-        ))}
-        <Note>
-          Nothing is uploaded. The file is read locally and every model trains in this
-          tab, so a large record is limited by your machine rather than a server timeout.
-        </Note>
-      </div>
-    </div>
+          <div className="panel">
+            <div className="eyebrow" style={{ marginTop: 0 }}>Generic format</div>
+            <p style={{ fontSize: '0.86rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>
+              One row per reading, with a timestamp column (<code>datetime</code>,{' '}
+              <code>timestamp</code>, <code>date</code>) and a wind-speed column
+              (<code>wind_speed</code>, <code>ws</code>, <code>speed</code>).
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel-full">
+        <h2>What gets<br />computed.</h2>
+        <p className="lede">
+          The evaluation protocol from the study, applied to whatever you upload.
+        </p>
+        <div className="grid2" style={{ marginTop: '2rem' }}>
+          {[
+            ['Preprocessing', 'Gaps under six hours by linear interpolation, longer gaps by the monthly median for that calendar month.'],
+            ['Features', '24 strictly causal lags forecasting one hour ahead, split chronologically — no shuffling, no lookahead.'],
+            ['Accuracy', 'RMSE, MAE, R² and MAPE, with 95% intervals from a moving-block bootstrap over 24-hour blocks.'],
+            ['Significance', 'Pairwise Diebold-Mariano tests with a Newey-West correction at lag 23.'],
+            ['Extremes', 'P95 tail RMSE and MAE, exceedance recall, Bland-Altman agreement and bias by decile.'],
+            ['Statistical layer', 'Weibull k and s by the MEPF method, projected to 100, 120 and 150 m with power density at each.'],
+          ].map(([title, body]) => (
+            <div className="panel" key={title}>
+              <div className="eyebrow" style={{ marginTop: 0 }}>{title}</div>
+              <p style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel-full">
+        <h2>Fifteen models,<br />one at a time or all at once.</h2>
+        <p className="lede">
+          Eight base learners and seven hybrid architectures. Every hybrid fits its
+          meta-regressor on held-out data the base learners never saw.
+        </p>
+        <div className="grid2" style={{ marginTop: '2rem' }}>
+          {[['Base', MM.BASE_MODELS], ['Hybrid', MM.HYBRID_MODELS]].map(([group, names]) => (
+            <div className="panel" key={group}>
+              <div className="eyebrow" style={{ marginTop: 0 }}>{group}</div>
+              <div className="chips">
+                {names.map((n) => (
+                  <span className="chip" key={n} title={MM.REGISTRY[n].blurb}>
+                    <span className="dot" style={{ background: FAMILY_COLOUR[MM.REGISTRY[n].family] }} />
+                    {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 

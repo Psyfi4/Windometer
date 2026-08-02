@@ -678,3 +678,174 @@ svg text { font-family: var(--body); }
     animation-play-state: paused;
   }
 }
+
+
+/* ====================================================================
+   Typography
+
+   Fluid rather than stepped: size interpolates with the viewport instead
+   of jumping at breakpoints, so there is no width at which the display
+   type looks wrong. Tight negative tracking on the large sizes, because
+   default spacing that reads well at 15px looks loose at 60px.
+   ==================================================================== */
+
+.masthead h1 {
+  font-size: clamp(2rem, 1.15rem + 3.4vw, 4.4rem);
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  margin-bottom: 0.7rem;
+}
+
+.masthead .sub {
+  font-size: clamp(0.92rem, 0.86rem + 0.3vw, 1.14rem);
+  line-height: 1.62;
+  max-width: 58ch;
+}
+
+.panel-full h2 {
+  font-size: clamp(1.6rem, 1rem + 2.4vw, 3.1rem);
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  margin-bottom: 1rem;
+}
+
+.panel-full .lede {
+  font-size: clamp(0.95rem, 0.88rem + 0.4vw, 1.2rem);
+  line-height: 1.7;
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+/* ====================================================================
+   Scroll
+
+   The document scroller is .app-root rather than the body, because a snap
+   container has to be the element that actually scrolls.
+
+   Landing snaps hard: those are full-height panels with nothing to read
+   line by line. Results snap only by proximity, so scrolling settles with
+   a section heading at the top but never traps you inside a long table.
+   ==================================================================== */
+
+.app-root {
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y proximity;
+  scroll-behavior: smooth;
+}
+
+.app-root.landing { scroll-snap-type: y mandatory; }
+
+.snap { scroll-snap-align: start; scroll-margin-top: 1.2rem; }
+
+/* section headings act as the snap points once there are results */
+.eyebrow { scroll-snap-align: start; scroll-margin-top: 1.4rem; }
+
+.panel-full {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem 0 5rem;
+  scroll-snap-align: start;
+}
+
+.app-root::-webkit-scrollbar { width: 10px; }
+.app-root::-webkit-scrollbar-track { background: transparent; }
+.app-root::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 6px;
+  border: 3px solid var(--ground);
+}
+.app-root::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ====================================================================
+   Scroll-linked reveals
+
+   Driven by the element's own position in the viewport, not by a
+   threshold that fires once, so the motion tracks the scroll rather than
+   playing at it. Pure CSS: no observer, no library.
+
+   Guarded by @supports and written so the resting state is the visible
+   one. Where animation-timeline is unavailable, nothing animates and
+   nothing is hidden.
+   ==================================================================== */
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal,
+    .main .cardrow,
+    .main .panel,
+    .main .tablewrap,
+    .main .note-box,
+    .main .chart-figure {
+      animation: revealIn linear both;
+      animation-timeline: view();
+      animation-range: entry 4% cover 26%;
+    }
+
+    .main .eyebrow {
+      animation: revealLabel linear both;
+      animation-timeline: view();
+      animation-range: entry 2% cover 20%;
+    }
+  }
+}
+
+@keyframes revealIn {
+  from { opacity: 0; transform: translateY(26px) scale(0.988); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes revealLabel {
+  from { opacity: 0; transform: translateX(-10px); letter-spacing: 0.28em; }
+  to   { opacity: 1; transform: none; letter-spacing: 0.16em; }
+}
+
+/* ====================================================================
+   Grade, grain and vignette
+
+   Three thin fixed layers between the backdrop and the interface. The
+   grain matters more than it sounds: large flat dark areas read as dead
+   pixels, and a few per cent of noise makes them read as a photographed
+   surface instead.
+   ==================================================================== */
+
+.grade {
+  position: fixed;
+  inset: 0;
+  z-index: 53;
+  pointer-events: none;
+  background: radial-gradient(
+    92% 58% at 50% -12%,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent 68%
+  );
+  opacity: 0.85;
+}
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 54;
+  pointer-events: none;
+  background: radial-gradient(
+    124% 96% at 50% 42%,
+    transparent 38%,
+    rgba(0, 0, 0, 0.42) 78%,
+    rgba(0, 0, 0, 0.62) 100%
+  );
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22300%22%3E%3Cfilter%20id%3D%22n%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.82%22%20numOctaves%3D%224%22%20stitchTiles%3D%22stitch%22%2F%3E%3CfeColorMatrix%20type%3D%22saturate%22%20values%3D%220%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22300%22%20height%3D%22300%22%20filter%3D%22url%28%23n%29%22%2F%3E%3C%2Fsvg%3E");
+  background-size: 300px 300px;
+}
