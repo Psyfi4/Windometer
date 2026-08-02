@@ -216,20 +216,6 @@ export default function Page() {
 
   /* ------------------------------ render ----------------------------- */
   const breathe = stationTheme.breathe ?? [accent, accent, accent];
-
-  const setup = {
-    file, dataset, busy, loadError, handleFile,
-    unit, reunit, site, setSite, customLat, setCustomLat, customLon, setCustomLon,
-    stationTheme, accent, presetName, setPresetName, preset,
-    chartStyle, setChartStyle, ambience, setAmbience,
-    runAll, setRunAll, chosen, setChosen, selected,
-    testSize, setTestSize, topK, setTopK,
-    alphaMode, setAlphaMode, alphaCustom, setAlphaCustom,
-    showScaled, setShowScaled, features, run, progress,
-    setupOpen, setSetupOpen, prefersReduced, forceMotion, setForceMotion,
-  };
-
-  const breathe = stationTheme.breathe ?? [accent, accent, accent];
   const showResults = Object.keys(evals).length > 0;
 
   const setup = {
