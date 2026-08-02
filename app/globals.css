@@ -930,10 +930,24 @@ svg text { font-family: var(--body); }
 
 /* The opening stage is centred on both axes, mark first and everything
    else stacked under it. */
+/* The opening stage.
+
+   Centring the whole stack would leave the mark sitting above the centre
+   line, because the two lines of text below it take up room and push it up.
+   Balancing the stage against the height of that text puts the mark itself
+   on the centre line, which is what reads as centred. */
 .stage.hero {
   align-items: center;
   text-align: center;
   justify-content: center;
+  padding-top: calc(5rem + var(--hero-below, 8.5rem));
+  padding-bottom: 5rem;
+}
+
+.stage.hero .stage-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .stage.hero .stage-index,
 .stage.hero .scroll-hint {
@@ -952,6 +966,7 @@ svg text { font-family: var(--body); }
   font-family: var(--mono);
   font-size: 0.66rem;
   letter-spacing: 0.24em;
+  text-indent: 0.24em;   /* see .wordmark-sub */
   color: var(--dim);
   text-transform: uppercase;
 }
@@ -996,6 +1011,10 @@ svg text { font-family: var(--body); }
   font-family: var(--mono);
   font-size: clamp(0.66rem, 0.6rem + 0.3vw, 0.86rem);
   letter-spacing: 0.42em;
+  /* letter-spacing is applied after the last glyph too, so the text box runs
+     one tracking unit wider than the letters. Centring the box would push the
+     word left by half of that; the indent puts it back. */
+  text-indent: 0.42em;
   text-transform: uppercase;
   color: var(--muted);
   margin-top: 1.6rem;
@@ -1016,6 +1035,7 @@ svg text { font-family: var(--body); }
   font-family: var(--mono);
   font-size: 0.68rem;
   letter-spacing: 0.2em;
+  text-indent: 0.2em;    /* see .wordmark-sub */
   text-transform: uppercase;
   color: var(--dim);
 }
