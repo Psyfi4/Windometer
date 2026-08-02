@@ -753,6 +753,18 @@ svg text { font-family: var(--body); }
   scroll-behavior: smooth;
 }
 
+/* When the eased scroller is running it owns the scroll position, and CSS
+   snap fights it — the browser pulls toward a snap point while the rAF loop
+   eases toward its own target, and the two stutter against each other. The
+   hook settles onto sections itself, so CSS snap is switched off here.
+
+   scroll-behavior goes too: it only affects programmatic scrolls, but
+   scrollIntoView would then animate on top of the loop. */
+.app-root.eased {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+}
+
 /* Proximity, never mandatory.
 
    Mandatory snapping plus a scroll-linked reveal that moves an element is a

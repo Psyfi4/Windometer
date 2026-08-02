@@ -28,6 +28,7 @@ import { themeForSite, chartTheme, PALETTE, SITE_THEMES } from '@/lib/theme';
 // unrotated spectrum. Version skew degrades instead of breaking.
 import * as Theme from '@/lib/theme';
 import Backdrop from '@/components/Backdrop';
+import { useSmoothScroll } from '@/lib/useSmoothScroll';
 import { Eyebrow, Note, Card, CardCI, CardRow, Table, Legend3 } from '@/components/ui';
 
 const HUB_HEIGHTS = [100, 120, 150];
@@ -72,6 +73,7 @@ export default function Page() {
   const [chartStyle, setChartStyle] = useState('notebook');
   const [ambience, setAmbience] = useState(true);
   const [setupOpen, setSetupOpen] = useState(true);
+  const scrollerRef = useRef(null);
   const [prefersReduced, setPrefersReduced] = useState(false);
   const [forceMotion, setForceMotion] = useState(false);
 
@@ -120,6 +122,10 @@ export default function Page() {
     setResults({});
     setEvals({});
   }, [dataset, unit]);
+
+  // Eased wheel scrolling. Off when ambience is off, and the hook disables
+  // itself under prefers-reduced-motion regardless.
+  useSmoothScroll(scrollerRef, { enabled: ambience && (!prefersReduced || forceMotion) });
 
   // The platform can ask for less motion. Honour it, but say so, because
   // otherwise the ambient effects look simply broken.
@@ -236,7 +242,8 @@ export default function Page() {
   return (
     <ChartThemeProvider theme={chartT}>
       <div
-        className="app-root"
+        ref={scrollerRef}
+        className={`app-root${ambience && (!prefersReduced || forceMotion) ? ' eased' : ''}`}
         data-motion={forceMotion ? 'on' : undefined}
         style={{
           '--accent': accent,
