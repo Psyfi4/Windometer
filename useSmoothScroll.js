@@ -14,6 +14,9 @@
  * by a critically damped spring. Once the wheel goes quiet the target moves to
  * the nearest section top, which the same spring then carries you to.
  *
+ * One wheel detent travels half the viewport, so two take you a full page and
+ * a stage boundary lands exactly on a detent.
+ *
  * A spring rather than an exponential lerp, for two reasons.
  *
  * A lerp puts its highest velocity on the very first frame and only decays from
@@ -43,11 +46,21 @@ import { useEffect } from 'react';
 
 export function useSmoothScroll(ref, {
   enabled = true,
-  smoothTime = 0.14,   // spring response; see the note above for the numbers
-  maxVelocity = 4200,  // px per second ceiling, so a flung wheel stays readable
+  smoothTime = 0.035,   // spring response; a half-page hop lands in ~0.15 s
+                        // across 9 frames. Below about 0.025 a hop spans
+                        // fewer than 5 frames and stops reading as movement
+                        // at all — the eye gets a start pose and an end pose,
+                        // so lowering it further removes the smoothness
+                        // rather than adding speed.
+  pageFraction = 0.5,   // a full 100-unit detent travels half the viewport
+  maxEventPages = 1.4,  // ceiling on what one event can ask for
+  maxVelocity = 12000,  // px per second ceiling, kept above the peak the
+                        // spring actually reaches so it never clips
   snapSelector = '.stage',
-  snapQuietMs = 110,   // wheel silence before settling onto a section
-  snapMaxPull = 0.42,  // only settle if within this fraction of the viewport
+  snapQuietMs = 110,    // wheel silence before settling onto a section
+  snapMaxPull = 0.40,   // settle only within this fraction of the viewport,
+                        // kept under pageFraction so one notch is never
+                        // yanked back to where it started
 } = {}) {
   useEffect(() => {
     const el = ref.current;
@@ -134,13 +147,40 @@ export function useSmoothScroll(ref, {
       }
     };
 
+    /**
+     * Every event is scaled the same way: its delta as a share of a nominal
+     * 100-unit detent, times the page fraction.
+     *
+     * An earlier version branched on delta size, treating anything under 50 as
+     * a trackpad and giving it a small fixed multiplier. That starved mice:
+     * with OS-level smooth scrolling a wheel does not emit one clean 100, it
+     * emits a burst of small deltas, and every one of them took the trackpad
+     * path and moved a few dozen pixels. The result was slower than no
+     * interception at all.
+     *
+     * Proportional scaling needs no such guess. A burst of small deltas sums to
+     * the same distance as the single large one it stands in for, and a
+     * trackpad — whose deltas are small precisely because the gesture is
+     * continuous — still gets movement matched to the finger.
+     */
     const onWheel = (e) => {
       // let the browser handle zoom and horizontal intent
       if (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
       e.preventDefault();
-      // deltaMode 1 is lines, 2 is pages
-      const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
-      target = clamp(target + e.deltaY * scale);
+
+      const page = el.clientHeight * pageFraction;
+
+      // normalise to detents, whatever units the browser reports in
+      let detents;
+      if (e.deltaMode === 2) detents = e.deltaY * (1 / pageFraction);  // pages
+      else if (e.deltaMode === 1) detents = e.deltaY / 3;              // lines
+      else detents = e.deltaY / 100;                                   // pixels
+
+      const cap = maxEventPages / pageFraction;
+      if (detents > cap) detents = cap;
+      else if (detents < -cap) detents = -cap;
+
+      target = clamp(target + detents * page);
       start();
       clearTimeout(quietTimer);
       quietTimer = setTimeout(settle, snapQuietMs);
@@ -163,7 +203,8 @@ export function useSmoothScroll(ref, {
       cancelAnimationFrame(raf);
       clearTimeout(quietTimer);
     };
-  }, [ref, enabled, smoothTime, maxVelocity, snapSelector, snapQuietMs, snapMaxPull]);
+  }, [ref, enabled, smoothTime, pageFraction, maxEventPages, maxVelocity,
+      snapSelector, snapQuietMs, snapMaxPull]);
 }
 
 export default useSmoothScroll;
