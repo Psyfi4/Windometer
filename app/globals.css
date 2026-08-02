@@ -4,12 +4,21 @@
    hybrids and the statistical layer.
    -------------------------------------------------------------------- */
 
-/* The GTA VI wordmark is a proprietary custom face and cannot be shipped
-   here. Archivo Black is the nearest free stand-in: heavy geometric
-   grotesque, wide apertures, the same poster weight. To use a licensed
-   file instead, drop it in public/fonts, add an @font-face below, and put
-   its family first in --font-display. Nothing else needs to change. */
-@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Anton&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Display face.
+
+   GTA Art Deco (Colophon Foundry for Rockstar Games) is licensed for use
+   solely on Rockstar brand materials, may not be converted, and may not be
+   redistributed. It is therefore not shipped here and must not be added.
+
+   Jost stands in: an open Futura-lineage geometric, which is the same
+   lineage the Rockstar face draws on. Measured against it, the targets are
+   a near-square O at 0.79 em, cap height 0.70 em and an x-height/cap ratio
+   near 0.74 — the low ratio and circular O are what make a deco geometric
+   read differently from a grotesque.
+
+   To use a face you are licensed for, drop the file in public/fonts, add an
+   @font-face here, and put its family first in --font-display. */
+@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   --ground: #08060f;
@@ -34,7 +43,9 @@
 
   --r: 9px;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
-  --font-display: 'Archivo Black', 'Anton', Impact, system-ui, sans-serif;
+  --font-display: 'Jost', 'Poppins', 'Century Gothic', system-ui, sans-serif;
+  --display-weight: 700;
+  --display-track: -0.01em;
   --display: var(--font-display);
   --body: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -923,9 +934,12 @@ svg text { font-family: var(--body); }
 
 .wordmark {
   font-family: var(--font-display);
+  font-weight: var(--display-weight, 700);
   font-size: clamp(3.6rem, 1.4rem + 12vw, 13rem);
-  line-height: 0.86;
-  letter-spacing: -0.045em;
+  line-height: 0.9;
+  /* a geometric wants far less negative tracking than a grotesque; its
+     round forms already sit tight */
+  letter-spacing: -0.012em;
   text-transform: uppercase;
   margin: 0;
   background: linear-gradient(
@@ -984,9 +998,10 @@ svg text { font-family: var(--body); }
 
 h2.stage-title {
   font-family: var(--font-display);
+  font-weight: var(--display-weight, 700);
   font-size: clamp(1.9rem, 1rem + 3.4vw, 4.2rem);
-  line-height: 1.02;
-  letter-spacing: -0.035em;
+  line-height: 1.06;
+  letter-spacing: -0.008em;
   text-transform: uppercase;
   margin-bottom: 1.1rem;
 }
@@ -1018,6 +1033,7 @@ h2.stage-title {
 }
 .picker-card .t {
   font-family: var(--font-display);
+  font-weight: var(--display-weight, 700);
   text-transform: uppercase;
   letter-spacing: -0.01em;
   font-size: 1.02rem;
