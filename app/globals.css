@@ -80,8 +80,6 @@ a { color: var(--accent); }
    contain: any of those would make it the containing block for its fixed
    descendants, and the frame would scroll away with the page instead of
    staying pinned to the window. */
-.app-root { min-height: 100vh; }
-
 .shell { min-height: 100vh; }
 
 .main {
@@ -748,6 +746,8 @@ svg text { font-family: var(--body); }
   height: 100vh;
   height: 100dvh;
   overflow-y: auto;
+  /* the hero mark bleeds to 100vw out of the centred column; clipping here
+     stops that becoming a horizontal scrollbar */
   overflow-x: hidden;
   scroll-snap-type: y proximity;
   scroll-behavior: smooth;
@@ -928,6 +928,21 @@ svg text { font-family: var(--body); }
 
 .stage.tall { justify-content: flex-start; padding-top: 6rem; }
 
+/* The opening stage is centred on both axes, mark first and everything
+   else stacked under it. */
+.stage.hero {
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+}
+.stage.hero .stage-index,
+.stage.hero .scroll-hint {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.stage.hero .hero-lede { margin-left: auto; margin-right: auto; }
+.stage.hero .wordmark-sub { margin-top: 1.9rem; }
+
 .stage-inner { width: 100%; }
 
 .stage-index {
@@ -945,31 +960,36 @@ svg text { font-family: var(--body); }
    Wordmark
    ==================================================================== */
 
-.wordmark {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight, 700);
-  font-size: clamp(3.6rem, 1.4rem + 12vw, 13rem);
-  line-height: 0.9;
-  /* a geometric wants far less negative tracking than a grotesque; its
-     round forms already sit tight */
-  letter-spacing: -0.012em;
-  text-transform: uppercase;
-  margin: 0;
-  background: linear-gradient(
-    100deg,
-    #FFB300 0%, #FF7A18 14%, #FF3B30 28%, #FF4D9D 42%,
-    #D926E8 56%, #8B5CF6 70%, #22D3EE 84%, #16E0C4 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: wordmarkDrift 16s ease-in-out infinite;
+/* The mark is SVG so it can span the window exactly. textLength pins the
+   word to the viewBox width and the viewBox scales to its container, so the
+   mark keeps the same proportion of the screen whichever font in the stack
+   loads. A vw font-size would drift the moment it fell back. */
+
+.hero-mark {
+  /* full bleed out of the centred .main column */
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding: 0 clamp(0.5rem, 1.8vw, 2.2rem);
 }
 
-@keyframes wordmarkDrift {
-  0%, 100% { background-position: 0% 50%; }
-  50%      { background-position: 100% 50%; }
+.wordmark-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* the colour keeps moving, as it does on the frame */
+  animation: markHue 19s linear infinite;
+}
+
+.wordmark-svg text {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight, 700);
+  font-size: 190px;          /* viewBox units; textLength sets the width */
+}
+
+@keyframes markHue {
+  from { filter: saturate(1.25) hue-rotate(0deg); }
+  to   { filter: saturate(1.25) hue-rotate(360deg); }
 }
 
 .wordmark-sub {

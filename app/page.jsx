@@ -260,11 +260,49 @@ export default function Page() {
 
         <main className="main">
 
-          {/* 1 — the mark */}
-          <section className="stage" id="stage-hero">
+          {/* 1 — the mark.
+
+              Set as SVG rather than styled text so it fills the window edge to
+              edge exactly. textLength pins the word to the viewBox width, and
+              the viewBox scales to the container, so the mark spans the same
+              proportion of the screen whichever font in the stack actually
+              loads — a CSS font-size in vw would drift as soon as it fell back
+              to Poppins or a system face. */}
+          <section className="stage hero" id="stage-hero">
             <div className="stage-index">01 — Windlab</div>
             <div className="stage-inner">
-              <h1 className="wordmark">Wind<br />lab</h1>
+              <div className="hero-mark">
+                <svg
+                  className="wordmark-svg"
+                  viewBox="0 0 1000 178"
+                  preserveAspectRatio="xMidYMid meet"
+                  role="img"
+                  aria-label="Windlab"
+                >
+                  <defs>
+                    <linearGradient id="wmGrad" x1="0%" y1="0%" x2="100%" y2="12%">
+                      <stop offset="0%" stopColor="#FFB300" />
+                      <stop offset="14%" stopColor="#FF7A18" />
+                      <stop offset="28%" stopColor="#FF3B30" />
+                      <stop offset="42%" stopColor="#FF4D9D" />
+                      <stop offset="56%" stopColor="#D926E8" />
+                      <stop offset="70%" stopColor="#8B5CF6" />
+                      <stop offset="84%" stopColor="#22D3EE" />
+                      <stop offset="100%" stopColor="#16E0C4" />
+                    </linearGradient>
+                  </defs>
+                  <text
+                    x="500"
+                    y="156"
+                    textAnchor="middle"
+                    textLength="982"
+                    lengthAdjust="spacing"
+                    fill="url(#wmGrad)"
+                  >
+                    WINDLAB
+                  </text>
+                </svg>
+              </div>
               <div className="wordmark-sub">Wind forecasting workbench</div>
               <p className="hero-lede">
                 Fifteen machine-learning models on your own wind record.
