@@ -170,7 +170,7 @@ function WindScape({ palette, seed, id }) {
  * The cycling layer
  * ------------------------------------------------------------------ */
 
-export default function Backdrop({ enabled = true, pinned = null }) {
+export default function Backdrop({ enabled = true, pinned = null, forceMotion = false }) {
   const [index, setIndex] = useState(0);
   const [photos, setPhotos] = useState({});
   const [reduced, setReduced] = useState(false);
@@ -210,13 +210,13 @@ export default function Backdrop({ enabled = true, pinned = null }) {
 
   // otherwise advance every five seconds
   useEffect(() => {
-    if (!enabled || reduced || pinned) return undefined;
+    if (!enabled || (reduced && !forceMotion) || pinned) return undefined;
     const id = setInterval(
       () => setIndex((i) => (i + 1) % SCAPE_ORDER.length),
       SLIDE_MS
     );
     return () => clearInterval(id);
-  }, [enabled, reduced, pinned]);
+  }, [enabled, reduced, forceMotion, pinned]);
 
   if (!enabled) return null;
 
