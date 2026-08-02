@@ -817,9 +817,18 @@ svg text { font-family: var(--body); }
       animation-range: entry 2% cover 20%;
     }
 
-    /* The page-turn: a section darkens and recedes as it leaves, and rises
-       out of darkness as it arrives. The section itself holds still; only
-       its inner wrapper moves, so the snap target never shifts. */
+    /* The page-turn, measured off the reference rather than guessed at.
+       Frame analysis of a 2 s transition gave:
+
+         vertical translation   0 px at every frame — it does not slide
+         scale of the outgoing  1.00 -> 0.92 while fading
+         trough luminance       ~10% of settled, rgb(23,22,38)
+         structural roughness   down 73% — the content is gone, not blurred
+         colour at the trough   keeps its blue cast, so no desaturation
+
+       An earlier version slid the content 48 px and desaturated it. Both
+       were wrong: the content holds its position, recedes very slightly,
+       and simply leaves. */
     .stage-inner {
       animation: stagePass linear both;
       animation-timeline: view();
@@ -829,10 +838,14 @@ svg text { font-family: var(--body); }
 }
 
 @keyframes stagePass {
-  0%   { opacity: 0; filter: brightness(0.08) saturate(0.4); transform: translateY(48px) scale(0.965); }
-  22%  { opacity: 1; filter: brightness(1) saturate(1);      transform: none; }
-  78%  { opacity: 1; filter: brightness(1) saturate(1);      transform: none; }
-  100% { opacity: 0; filter: brightness(0.08) saturate(0.4); transform: translateY(-48px) scale(0.965); }
+  /* flat holds at each end are the dark gap: the reference sits at the
+     trough for roughly a third of the transition before the next arrives */
+  0%   { opacity: 0; transform: scale(0.92); }
+  9%   { opacity: 0; transform: scale(0.94); }
+  27%  { opacity: 1; transform: scale(1); }
+  73%  { opacity: 1; transform: scale(1); }
+  91%  { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 0; transform: scale(0.92); }
 }
 
 @keyframes revealIn {
