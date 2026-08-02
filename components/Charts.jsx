@@ -124,9 +124,10 @@ function Panel({ w, h, xDomain, yDomain, xLabel, yLabel, xTicks, children, title
 /** Notebook charts sit on a white card, the way a matplotlib figure does. */
 function Figure({ children }) {
   const T = useChartTheme();
-  if (T.panel === 'transparent') return <div>{children}</div>;
+  // the class is what the scroll-linked reveal hooks onto
+  if (T.panel === 'transparent') return <div className="chart-figure">{children}</div>;
   return (
-    <div style={{
+    <div className="chart-figure" style={{
       background: T.panel,
       borderRadius: T.panelRadius,
       padding: '0.5rem 0.4rem 0.2rem',
