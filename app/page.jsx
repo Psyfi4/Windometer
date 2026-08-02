@@ -31,7 +31,14 @@ import Backdrop from '@/components/Backdrop';
 import { Eyebrow, Note, Card, CardCI, CardRow, Table, Legend3 } from '@/components/ui';
 
 const HUB_HEIGHTS = [100, 120, 150];
-const TABS = ['Dataset', 'Models', 'Comparison', 'Weibull & power', 'Region', 'Export'];
+const OUTPUTS = [
+  { key: 'Dataset', title: 'Dataset', blurb: 'Record span, gap treatment, diurnal profile and the observed distribution against its Weibull fit.' },
+  { key: 'Comparison', title: 'Comparison', blurb: 'Leaderboard, error with bootstrap intervals, Diebold-Mariano significance, all models against the observed series.' },
+  { key: 'Models', title: 'Per model', blurb: 'One model at a time: accuracy, agreement, extreme-wind behaviour, which lags it leans on.' },
+  { key: 'Weibull', title: 'Weibull & power', blurb: 'Shape and scale by the MEPF method, power density at 100, 120 and 150 m.' },
+  { key: 'Region', title: 'Region', blurb: 'Where the record comes from, and the other stations in the study.' },
+  { key: 'Export', title: 'Export', blurb: 'Metrics, predictions and tables as CSV, plus the exact run settings.' },
+];
 
 const fmtInt = (n) => n.toLocaleString('en-US');
 
@@ -59,7 +66,7 @@ export default function Page() {
   const [results, setResults] = useState({});
   const [evals, setEvals] = useState({});
   const [progress, setProgress] = useState(null);
-  const [tab, setTab] = useState('Dataset');
+  const [outputs, setOutputs] = useState(OUTPUTS.map((o) => o.key));
   const [activeModel, setActiveModel] = useState(null);
   const [dmLoss, setDmLoss] = useState('squared');
   const [chartStyle, setChartStyle] = useState('notebook');
@@ -95,7 +102,6 @@ export default function Page() {
       setFile(f);
       const guess = SITES.detectSite(f.name);
       if (guess) setSite(guess);
-      setTab('Dataset');
     } catch (err) {
       setLoadError(err?.message || String(err));
       setDataset(null);
@@ -181,8 +187,11 @@ export default function Page() {
     const ok = Object.keys(nextEvals);
     if (ok.length) {
       setActiveModel(ok[0]);
-      setTab(ok.length > 1 ? 'Comparison' : 'Models');
       setSetupOpen(false);   // give the results the room once there are some
+      // carry the reader down to the results rather than leaving them on the deck
+      requestAnimationFrame(() => {
+        document.getElementById('stage-outputs')?.scrollIntoView({ behavior: 'smooth' });
+      });
     }
   }, [features, selected, preset, topK]);
 
@@ -220,13 +229,29 @@ export default function Page() {
     setupOpen, setSetupOpen, prefersReduced, forceMotion, setForceMotion,
   };
 
+  const breathe = stationTheme.breathe ?? [accent, accent, accent];
+  const showResults = Object.keys(evals).length > 0;
+
+  const setup = {
+    file, dataset, busy, loadError, handleFile,
+    unit, reunit, site, setSite, customLat, setCustomLat, customLon, setCustomLon,
+    stationTheme, accent, presetName, setPresetName, preset,
+    chartStyle, setChartStyle, ambience, setAmbience,
+    runAll, setRunAll, chosen, setChosen, selected,
+    testSize, setTestSize, topK, setTopK,
+    alphaMode, setAlphaMode, alphaCustom, setAlphaCustom,
+    showScaled, setShowScaled, features, run, progress,
+    setupOpen, setSetupOpen, prefersReduced, forceMotion, setForceMotion,
+  };
+
+  const toggleOutput = (key) => setOutputs(
+    outputs.includes(key) ? outputs.filter((k) => k !== key) : [...outputs, key]
+  );
+
   return (
     <ChartThemeProvider theme={chartT}>
-      {/* The custom properties live here, above the frame as well as the
-          shell. Setting them on the shell alone left the frame — a sibling —
-          unable to resolve them, so it painted nothing. */}
       <div
-        className={`app-root${!dataset ? ' landing' : ''}`}
+        className="app-root"
         data-motion={forceMotion ? 'on' : undefined}
         style={{
           '--accent': accent,
@@ -247,71 +272,179 @@ export default function Page() {
             <div className="frame-layer frame" aria-hidden="true" />
           </>
         )}
-        <div className={`shell${ambience ? ' ambient' : ''}`}>
-          <main className="main">
-          <div className="masthead">
-            <h1>Wind forecasting <span className="mark">workbench</span></h1>
-            <div className="sub">
-              Upload an hourly wind record, then run any model on its own or the whole set.
-              Error metrics with bootstrap intervals, Diebold-Mariano tests, tail behaviour
-              and Weibull power density at hub height, all computed from your own data —
-              in this tab, with nothing sent to a server.
+
+        <main className="main">
+
+          {/* 1 — the mark */}
+          <section className="stage" id="stage-hero">
+            <div className="stage-index">01 — Windlab</div>
+            <div className="stage-inner">
+              <h1 className="wordmark">Wind<br />lab</h1>
+              <div className="wordmark-sub">Wind forecasting workbench</div>
+              <p className="hero-lede">
+                Fifteen machine-learning models on your own wind record.
+                Trained in this tab, on your machine, with nothing sent anywhere.
+              </p>
             </div>
-          </div>
+            <div className="scroll-hint">Scroll</div>
+          </section>
 
-          <Deck {...setup} />
-
-          {!dataset ? (
-            <Landing />
-          ) : (
-            <>
-              <div className="tabs">
-                {TABS.map((t) => (
-                  <button key={t} className={`tab ${tab === t ? 'on' : ''}`} onClick={() => setTab(t)}>{t}</button>
+          {/* 2 — what it does */}
+          <section className="stage" id="stage-what">
+            <div className="stage-index">02 — What it does</div>
+            <div className="stage-inner">
+              <h2 className="stage-title">Forecast wind,<br />an hour ahead.</h2>
+              <p className="lede">
+                Upload an hourly record and Windlab reconstructs it into a continuous
+                series, builds causal features from the previous day, trains whichever
+                models you choose, and reports how well each one did — with the
+                statistics needed to say whether the difference between them is real.
+              </p>
+              <div className="grid2" style={{ marginTop: '2.2rem' }}>
+                {[
+                  ['Two layouts, no setup', 'IMD station files — one row per day with YEAR, MN, DT and hourly columns S01…S24 — or any table with a timestamp and a wind-speed column. Sub-hourly readings are averaged up to the hour.'],
+                  ['Nothing leaves the machine', 'The file is read locally and every model trains in the browser. A long record is limited by your laptop rather than a server timeout, and no data is uploaded.'],
+                  ['Fifteen models', 'Eight base learners — forests, four boosters, LSTM, BiLSTM, CNN — and seven hybrids that stack, blend or correct one another.'],
+                  ['The statistical layer too', 'Weibull shape and scale by the Modified Energy Pattern Factor method, projected to turbine hub height for power density.'],
+                ].map(([t, b]) => (
+                  <div className="panel" key={t}>
+                    <div className="eyebrow" style={{ marginTop: 0 }}>{t}</div>
+                    <p style={{ fontSize: '0.86rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{b}</p>
+                  </div>
                 ))}
               </div>
+            </div>
+          </section>
 
+          {/* 3 — how it works */}
+          <section className="stage" id="stage-how">
+            <div className="stage-index">03 — How it works</div>
+            <div className="stage-inner">
+              <h2 className="stage-title">The protocol,<br />not just the score.</h2>
+              <p className="lede">
+                A number without a method behind it is decoration. Every run follows the
+                evaluation protocol from Yadav et al. (2025), and reports the tests that
+                say whether a difference is real.
+              </p>
+              <div className="grid2" style={{ marginTop: '2.2rem' }}>
+                {[
+                  ['Gaps', 'Under six hours by linear interpolation. Longer gaps take the monthly median for that calendar month. Empty months fall back to the record median.'],
+                  ['Features', 'Twenty-four strictly causal lags forecasting one hour ahead. Nothing from the future reaches the model.'],
+                  ['Split', 'Strictly chronological. Earliest data trains, latest data tests, no shuffling and no lookahead.'],
+                  ['Accuracy', 'RMSE, MAE, R² and MAPE, in physical units and on the min-max scaled target so the published table can be compared with.'],
+                  ['Uncertainty', 'Ninety-five per cent intervals from a moving-block bootstrap over twenty-four-hour blocks, which keeps temporal dependence intact.'],
+                  ['Significance', 'Pairwise Diebold-Mariano tests with a Newey-West correction at lag 23. Overlapping intervals mean the data does not resolve the gap.'],
+                  ['Extremes', 'P95 tail error and exceedance recall, because a model that tracks the mean and misses every gale is not much use to a turbine.'],
+                  ['Honest hybrids', 'Every hybrid fits its meta-regressor on a later held-out slice the base learners never saw. Fitting it in-sample leaks, and flatters the result.'],
+                ].map(([t, b]) => (
+                  <div className="panel" key={t}>
+                    <div className="eyebrow" style={{ marginTop: 0 }}>{t}</div>
+                    <p style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{b}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* 4 — the workbench */}
+          <section className="stage tall" id="stage-workbench">
+            <div className="stage-index">04 — Set up the run</div>
+            <div className="stage-inner">
+              <h2 className="stage-title">Your data,<br />your models.</h2>
+              <Deck {...setup} />
+              {!dataset && (
+                <Note>
+                  Drop a file above to begin. Nothing is uploaded — the file is read
+                  locally and every model trains in this tab.
+                </Note>
+              )}
               {failures.length > 0 && (
-                <div style={{ marginBottom: '1rem' }}>
+                <div style={{ marginTop: '1rem' }}>
                   <Note tone="coral">
                     {failures.length === 1 ? 'One model did not finish' : `${failures.length} models did not finish`}:{' '}
                     {failures.map((f) => `${f.name} (${f.error})`).join('; ')}
                   </Note>
                 </div>
               )}
+            </div>
+          </section>
 
-              {tab === 'Dataset' && <DatasetTab dataset={dataset} weibull={weibull} />}
-              {tab === 'Models' && (
-                <ModelsTab
-                  results={results} evals={evals} features={features}
-                  activeModel={activeModel} setActiveModel={setActiveModel}
-                  showScaled={showScaled}
-                />
+          {/* 5 — choose the output */}
+          <section className="stage" id="stage-outputs">
+            <div className="stage-index">05 — Choose the output</div>
+            <div className="stage-inner">
+              <h2 className="stage-title">What should<br />it show?</h2>
+              <p className="lede">
+                {showResults
+                  ? 'Everything below is already computed. Pick which of it to lay out.'
+                  : 'Pick now, or come back after a run. Nothing here recomputes anything.'}
+              </p>
+              <div className="picker">
+                {OUTPUTS.map((o) => (
+                  <button
+                    key={o.key}
+                    className={`picker-card${outputs.includes(o.key) ? ' on' : ''}`}
+                    onClick={() => toggleOutput(o.key)}
+                  >
+                    <span className="mark" />
+                    <span className="t">{o.title}</span>
+                    <span className="b">{o.blurb}</span>
+                  </button>
+                ))}
+              </div>
+              {showResults && (
+                <div style={{ marginTop: '1.6rem' }}>
+                  <button
+                    className="btn"
+                    style={{ width: 'auto', padding: '0.6rem 1.8rem' }}
+                    onClick={() => document.getElementById('stage-result-0')?.scrollIntoView({ behavior: 'smooth' })}
+                  >
+                    Show {outputs.length} {outputs.length === 1 ? 'section' : 'sections'}
+                  </button>
+                </div>
               )}
-              {tab === 'Comparison' && (
-                <ComparisonTab
-                  results={results} evals={evals} board={board} features={features}
-                  showScaled={showScaled} site={site} dmLoss={dmLoss} setDmLoss={setDmLoss}
-                />
-              )}
-              {tab === 'Weibull & power' && (
-                <WeibullTab
-                  weibull={weibull} dataset={dataset} site={site}
-                  results={results} features={features} bestModel={bestModel}
-                />
-              )}
-              {tab === 'Region' && <RegionTab site={site} lat={lat} lon={lon} />}
-              {tab === 'Export' && (
-                <ExportTab
-                  board={board} results={results} evals={evals} features={features}
-                  weibull={weibull} dataset={dataset} file={file} preset={preset}
-                  presetName={presetName} testSize={testSize} unit={unit} site={site}
-                />
-              )}
-            </>
-          )}
-          </main>
-        </div>
+            </div>
+          </section>
+
+          {/* 6+ — one stage per chosen output, each with the same transition */}
+          {showResults && OUTPUTS.filter((o) => outputs.includes(o.key)).map((o, i) => (
+            <section className="stage tall" key={o.key} id={`stage-result-${i}`}>
+              <div className="stage-index">{String(6 + i).padStart(2, '0')} — {o.title}</div>
+              <div className="stage-inner">
+                <h2 className="stage-title">{o.title}</h2>
+                {o.key === 'Dataset' && <DatasetTab dataset={dataset} weibull={weibull} />}
+                {o.key === 'Comparison' && (
+                  <ComparisonTab
+                    results={results} evals={evals} board={board} features={features}
+                    showScaled={showScaled} site={site} dmLoss={dmLoss} setDmLoss={setDmLoss}
+                  />
+                )}
+                {o.key === 'Models' && (
+                  <ModelsTab
+                    results={results} evals={evals} features={features}
+                    activeModel={activeModel} setActiveModel={setActiveModel}
+                    showScaled={showScaled}
+                  />
+                )}
+                {o.key === 'Weibull' && (
+                  <WeibullTab
+                    weibull={weibull} dataset={dataset} site={site}
+                    results={results} features={features} bestModel={bestModel}
+                  />
+                )}
+                {o.key === 'Region' && <RegionTab site={site} lat={lat} lon={lon} />}
+                {o.key === 'Export' && (
+                  <ExportTab
+                    board={board} results={results} evals={evals} features={features}
+                    weibull={weibull} dataset={dataset} file={file} preset={preset}
+                    presetName={presetName} testSize={testSize} unit={unit} site={site}
+                  />
+                )}
+              </div>
+            </section>
+          ))}
+
+        </main>
       </div>
     </ChartThemeProvider>
   );
@@ -640,83 +773,6 @@ function ModelCheck({ name, chosen, setChosen }) {
         {spec.needsTF && <span className="pill" style={{ marginLeft: '0.35rem' }}>slower</span>}
       </span>
     </label>
-  );
-}
-
-function Landing() {
-  return (
-    <>
-      <section className="panel-full">
-        <h2>Drop a record<br />and start.</h2>
-        <p className="lede">
-          Two layouts are recognised without any configuration. Everything after
-          that happens in this tab — the file is read locally, the models train
-          on your machine, and nothing is sent anywhere.
-        </p>
-        <div className="grid2" style={{ marginTop: '2rem' }}>
-          <div className="panel">
-            <div className="eyebrow" style={{ marginTop: 0 }}>IMD station format</div>
-            <p style={{ fontSize: '0.86rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>
-              One row per day, with <code>YEAR</code>, <code>MN</code>, <code>DT</code>{' '}
-              and 24 hourly columns <code>S01</code>…<code>S24</code>.
-            </p>
-          </div>
-          <div className="panel">
-            <div className="eyebrow" style={{ marginTop: 0 }}>Generic format</div>
-            <p style={{ fontSize: '0.86rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>
-              One row per reading, with a timestamp column (<code>datetime</code>,{' '}
-              <code>timestamp</code>, <code>date</code>) and a wind-speed column
-              (<code>wind_speed</code>, <code>ws</code>, <code>speed</code>).
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="panel-full">
-        <h2>What gets<br />computed.</h2>
-        <p className="lede">
-          The evaluation protocol from the study, applied to whatever you upload.
-        </p>
-        <div className="grid2" style={{ marginTop: '2rem' }}>
-          {[
-            ['Preprocessing', 'Gaps under six hours by linear interpolation, longer gaps by the monthly median for that calendar month.'],
-            ['Features', '24 strictly causal lags forecasting one hour ahead, split chronologically — no shuffling, no lookahead.'],
-            ['Accuracy', 'RMSE, MAE, R² and MAPE, with 95% intervals from a moving-block bootstrap over 24-hour blocks.'],
-            ['Significance', 'Pairwise Diebold-Mariano tests with a Newey-West correction at lag 23.'],
-            ['Extremes', 'P95 tail RMSE and MAE, exceedance recall, Bland-Altman agreement and bias by decile.'],
-            ['Statistical layer', 'Weibull k and s by the MEPF method, projected to 100, 120 and 150 m with power density at each.'],
-          ].map(([title, body]) => (
-            <div className="panel" key={title}>
-              <div className="eyebrow" style={{ marginTop: 0 }}>{title}</div>
-              <p style={{ fontSize: '0.85rem', lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-full">
-        <h2>Fifteen models,<br />one at a time or all at once.</h2>
-        <p className="lede">
-          Eight base learners and seven hybrid architectures. Every hybrid fits its
-          meta-regressor on held-out data the base learners never saw.
-        </p>
-        <div className="grid2" style={{ marginTop: '2rem' }}>
-          {[['Base', MM.BASE_MODELS], ['Hybrid', MM.HYBRID_MODELS]].map(([group, names]) => (
-            <div className="panel" key={group}>
-              <div className="eyebrow" style={{ marginTop: 0 }}>{group}</div>
-              <div className="chips">
-                {names.map((n) => (
-                  <span className="chip" key={n} title={MM.REGISTRY[n].blurb}>
-                    <span className="dot" style={{ background: FAMILY_COLOUR[MM.REGISTRY[n].family] }} />
-                    {n}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    </>
   );
 }
 
