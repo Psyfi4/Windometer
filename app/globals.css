@@ -1174,15 +1174,15 @@ h2.stage-title {
 
 /* the same cycle, held closer to the resting ink so long text stays calm */
 @keyframes breatheProse {
-  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 42%, var(--ink)); }
-  33%      { color: color-mix(in srgb, var(--breathe-2) 42%, var(--ink)); }
-  66%      { color: color-mix(in srgb, var(--breathe-3) 42%, var(--ink)); }
+  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 78%, var(--ink)); }
+  33%      { color: color-mix(in srgb, var(--breathe-2) 78%, var(--ink)); }
+  66%      { color: color-mix(in srgb, var(--breathe-3) 78%, var(--ink)); }
 }
 
 @keyframes breatheMuted {
-  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 34%, var(--muted)); }
-  33%      { color: color-mix(in srgb, var(--breathe-2) 34%, var(--muted)); }
-  66%      { color: color-mix(in srgb, var(--breathe-3) 34%, var(--muted)); }
+  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 66%, var(--muted)); }
+  33%      { color: color-mix(in srgb, var(--breathe-2) 66%, var(--muted)); }
+  66%      { color: color-mix(in srgb, var(--breathe-3) 66%, var(--muted)); }
 }
 
 /* display type and labels — full swing */
