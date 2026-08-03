@@ -87,6 +87,7 @@ export default function Page() {
   const [baselineId, setBaselineId] = useState(null);
   const [libMsg, setLibMsg] = useState(null);
   const [libBusy, setLibBusy] = useState(false);
+  const [restored, setRestored] = useState(null);
 
   const preset = MM.PRESETS[presetName];
   const stationTheme = themeForSite(site);
@@ -159,6 +160,39 @@ export default function Page() {
 
   useEffect(() => { refreshLibrary(); }, [refreshLibrary]);
 
+  // Bring back the last finished run. A run costs minutes; a reload should not
+  // cost them again. Predictions and the hourly series are stored as typed
+  // arrays, so this is a read rather than a recomputation.
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const store = await import('@/lib/store');
+        const sess = await store.loadSession();
+        if (!live || !sess?.dataset || !sess?.results) return;
+        setDataset(sess.dataset);
+        setResults(sess.results);
+        setEvals(sess.evals ?? {});
+        setFile(sess.fileMeta ?? null);
+        if (sess.site) setSite(sess.site);
+        if (sess.unit) setUnit(sess.unit);
+        if (sess.presetName) setPresetName(sess.presetName);
+        if (sess.chosen) setChosen(sess.chosen);
+        if (typeof sess.testSize === 'number') setTestSize(sess.testSize);
+        setActiveModel(Object.keys(sess.evals ?? {})[0] ?? null);
+        setSetupOpen(false);
+        setRestored({
+          at: sess.savedAt,
+          models: Object.keys(sess.evals ?? {}).length,
+          name: sess.fileMeta?.name ?? 'a previous run',
+        });
+      } catch {
+        // no session, or a browser without IndexedDB — start clean
+      }
+    })();
+    return () => { live = false; };
+  }, []);
+
   /* ------------------------------ features --------------------------- */
   const features = useMemo(() => {
     if (!dataset) return null;
@@ -184,6 +218,7 @@ export default function Page() {
     ? Object.keys(MM.REGISTRY)
     : chosen.filter((n) => MM.REGISTRY[n]);
 
+  const persistRef = useRef(null);
   const run = useCallback(async () => {
     if (!features || !selected.length) return;
     setBusy(true);
@@ -215,12 +250,59 @@ export default function Page() {
     if (ok.length) {
       setActiveModel(ok[0]);
       setSetupOpen(false);   // give the results the room once there are some
+
+      // Keep the run without being asked. Saving used to be a button, which
+      // meant a reload after ten minutes of training threw the lot away — a
+      // poor trade for the storage it saved. The session holds the whole thing
+      // so the page comes back; the library entry holds the metrics so it can
+      // still be compared against later.
+      persistRef.current?.(nextResults, nextEvals).catch(() => {});
+
       // carry the reader down to the results rather than leaving them on the deck
       requestAnimationFrame(() => {
         document.getElementById('stage-outputs')?.scrollIntoView({ behavior: 'smooth' });
       });
     }
   }, [features, selected, preset, topK]);
+
+  /**
+   * Write the finished run to both stores.
+   *
+   * The session is the working copy — everything needed to redraw the page.
+   * The library entry is the durable record: metrics and the Weibull fit only,
+   * because a comparison never reads a prediction and keeping them would put
+   * megabytes into the archive for every run.
+   */
+  const persist = useCallback(async (runResults, runEvals) => {
+    const store = await import('@/lib/store');
+
+    const rows = Object.entries(runEvals).map(([name, ev]) => ({
+      Model: name,
+      Type: MM.REGISTRY[name].kind === 'base' ? 'Base' : 'Hybrid',
+      rmse: ev.raw.rmse, mae: ev.raw.mae, r2: ev.raw.r2, mape: ev.raw.mape,
+      rmseScaled: ev.scaled?.rmse, maeScaled: ev.scaled?.mae,
+      seconds: runResults[name]?.seconds,
+    })).sort((a, b) => a.rmse - b.rmse);
+
+    await store.saveSession({
+      dataset,
+      results: runResults,
+      evals: runEvals,
+      fileMeta: file ? { name: file.name, size: file.size } : null,
+      site, unit, presetName, testSize, topK,
+      chosen: selected,
+    });
+
+    await store.saveRun(buildRecord({
+      file, dataset, site, unit, presetName, preset, testSize, topK,
+      board: rows, evals: runEvals, results: runResults, weibull,
+      label: file?.name,
+    }));
+    await refreshLibrary();
+  }, [dataset, file, site, unit, presetName, preset, testSize, topK, selected, weibull, refreshLibrary]);
+
+  // run() is declared above persist, so it reaches it through a ref
+  persistRef.current = persist;
 
   const saveCurrentRun = useCallback(async (label) => {
     if (!Object.keys(evals).length) return;
@@ -321,75 +403,11 @@ export default function Page() {
 
         <main className="main">
 
-          {/* 1 — the mark.
-
-              Set as SVG rather than styled text so it fills the window edge to
-              edge exactly. textLength pins the word to the viewBox width, and
-              the viewBox scales to the container, so the mark spans the same
-              proportion of the screen whichever font in the stack actually
-              loads — a CSS font-size in vw would drift as soon as it fell back
-              to Poppins or a system face. */}
+          {/* 1 — the mark. See the Wordmark component for how it is fitted. */}
           <section className="stage hero" id="stage-hero">
             <div className="stage-index">01 — Windlab</div>
             <div className="stage-inner">
-              <div className="hero-mark">
-                <svg
-                  className="wordmark-svg"
-                  viewBox="0 0 1000 178"
-                  preserveAspectRatio="xMidYMid meet"
-                  role="img"
-                  aria-label="Windlab"
-                >
-                  <defs>
-                    {/* Vertical, like the logo it is sampled from: the V and
-                        the I run indigo at the top down to amber at the foot.
-
-                        spreadMethod="reflect" repeats the ramp mirrored beyond
-                        its ends, so translating the gradient slides new colour
-                        through the letters without ever leaving the nine
-                        sampled stops. The filter that used to do this rotated
-                        hue through a full turn, which necessarily passed
-                        through greens and cyans the logo has none of. */}
-                    <linearGradient
-                      id="wmGrad"
-                      x1="0%" y1="0%" x2="0%" y2="100%"
-                      spreadMethod="reflect"
-                    >
-                      <stop offset="0%" stopColor="#4D62D5" />
-                      <stop offset="12.5%" stopColor="#7A40C8" />
-                      <stop offset="25%" stopColor="#B62FC7" />
-                      <stop offset="37.5%" stopColor="#E634C7" />
-                      <stop offset="50%" stopColor="#F051B0" />
-                      <stop offset="62.5%" stopColor="#F5699A" />
-                      <stop offset="75%" stopColor="#F27B75" />
-                      <stop offset="87.5%" stopColor="#F79262" />
-                      <stop offset="100%" stopColor="#F5B35E" />
-                      {ambience && (!prefersReduced || forceMotion) && (
-                        // two bbox heights is one full period of a reflected
-                        // ramp, so the slide loops with no visible seam
-                        <animateTransform
-                          attributeName="gradientTransform"
-                          type="translate"
-                          from="0 0"
-                          to="0 2"
-                          dur="17s"
-                          repeatCount="indefinite"
-                        />
-                      )}
-                    </linearGradient>
-                  </defs>
-                  <text
-                    x="500"
-                    y="156"
-                    textAnchor="middle"
-                    textLength="982"
-                    lengthAdjust="spacing"
-                    fill="url(#wmGrad)"
-                  >
-                    WINDLAB
-                  </text>
-                </svg>
-              </div>
+              <Wordmark ambience={ambience} moving={!prefersReduced || forceMotion} />
               <div className="wordmark-sub">Wind forecasting workbench</div>
               <p className="hero-lede">
                 Fifteen machine-learning models on your own wind record.
@@ -462,6 +480,34 @@ export default function Page() {
             <div className="stage-inner">
               <h2 className="stage-title">Your data,<br />your models.</h2>
               <Deck {...setup} />
+
+              {restored && (
+                <div style={{ marginTop: '1rem' }}>
+                  <Note tone="teal">
+                    Picked up where you left off — <b>{restored.name}</b>, {restored.models}{' '}
+                    model{restored.models === 1 ? '' : 's'}, finished{' '}
+                    {new Date(restored.at).toLocaleString()}. Runs are kept automatically, so
+                    a reload no longer costs you the training time.{' '}
+                    <button
+                      className="btn-ghost"
+                      style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', marginTop: '0.4rem' }}
+                      onClick={async () => {
+                        const store = await import('@/lib/store');
+                        await store.clearSession();
+                        setRestored(null);
+                        setResults({});
+                        setEvals({});
+                        setDataset(null);
+                        setFile(null);
+                        setSetupOpen(true);
+                      }}
+                    >
+                      Start fresh
+                    </button>
+                  </Note>
+                </div>
+              )}
+
               {!dataset && (
                 <Note>
                   Drop a file above to begin. Nothing is uploaded — the file is read
@@ -568,6 +614,118 @@ export default function Page() {
         </main>
       </div>
     </ChartThemeProvider>
+  );
+}
+
+/* ==================================================================== *
+ * The mark
+ *
+ * Measured rather than forced.
+ *
+ * The first version pinned the word to an exact width with textLength, on the
+ * reasoning that it would then span the window whatever font loaded. It does
+ * the opposite: the browser has to absorb the whole difference between the
+ * font's natural width and the number given, and when that gap is large the
+ * glyphs crowd, overlap or drop out entirely. The width was also chosen from
+ * assumed advances, and measured before the webfont arrived, so the correction
+ * was computed against a fallback face and never revisited.
+ *
+ * So the text is laid out normally and the viewBox is fitted to whatever it
+ * actually measures. Same result — the mark spans the window exactly — with no
+ * distortion, correct for any face, and re-fitted once the real font lands.
+ * ==================================================================== */
+
+function Wordmark({ ambience, moving }) {
+  const textRef = useRef(null);
+  const [box, setBox] = useState(null);
+
+  useEffect(() => {
+    const node = textRef.current;
+    if (!node) return undefined;
+
+    const fit = () => {
+      try {
+        const b = node.getBBox();
+        if (b.width > 0 && b.height > 0) {
+          const padX = b.width * 0.012;   // a hair of air so the ends do not clip
+          setBox({
+            x: b.x - padX,
+            y: b.y,
+            w: b.width + padX * 2,
+            h: b.height,
+          });
+        }
+      } catch {
+        // getBBox throws while the element is not being rendered; the resize
+        // and font-ready callbacks below will catch it once it is
+      }
+    };
+
+    fit();
+    // the first measurement lands on the fallback face, so measure again once
+    // the webfont has actually loaded
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(fit).catch(() => {});
+    }
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    if (ro && node.parentNode) ro.observe(node.parentNode);
+    window.addEventListener('resize', fit);
+
+    return () => {
+      window.removeEventListener('resize', fit);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
+  return (
+    <div className="hero-mark">
+      <svg
+        className="wordmark-svg"
+        viewBox={box ? `${box.x} ${box.y} ${box.w} ${box.h}` : '0 0 1000 200'}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Windlab"
+      >
+        <defs>
+          {/* Vertical, like the logo it is sampled from: the V and the I run
+              indigo at the top down to amber at the foot.
+
+              spreadMethod="reflect" repeats the ramp mirrored beyond its ends,
+              so translating the gradient slides new colour through the letters
+              without ever leaving the nine sampled stops. */}
+          <linearGradient
+            id="wmGrad"
+            x1="0%" y1="0%" x2="0%" y2="100%"
+            spreadMethod="reflect"
+          >
+            <stop offset="0%" stopColor="#4D62D5" />
+            <stop offset="12.5%" stopColor="#7A40C8" />
+            <stop offset="25%" stopColor="#B62FC7" />
+            <stop offset="37.5%" stopColor="#E634C7" />
+            <stop offset="50%" stopColor="#F051B0" />
+            <stop offset="62.5%" stopColor="#F5699A" />
+            <stop offset="75%" stopColor="#F27B75" />
+            <stop offset="87.5%" stopColor="#F79262" />
+            <stop offset="100%" stopColor="#F5B35E" />
+            {ambience && moving && (
+              // two bbox heights is one full period of a reflected ramp, so the
+              // slide loops with no visible seam
+              <animateTransform
+                attributeName="gradientTransform"
+                type="translate"
+                from="0 0"
+                to="0 2"
+                dur="17s"
+                repeatCount="indefinite"
+              />
+            )}
+          </linearGradient>
+        </defs>
+        <text ref={textRef} x="0" y="160" fill="url(#wmGrad)">
+          WINDLAB
+        </text>
+      </svg>
+    </div>
   );
 }
 
