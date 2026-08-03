@@ -243,7 +243,15 @@ export default function Page() {
     <ChartThemeProvider theme={chartT}>
       <div
         ref={scrollerRef}
-        className={`app-root${ambience && (!prefersReduced || forceMotion) ? ' eased' : ''}`}
+        // `ambient` gates 112 rules in the stylesheet — the breathing colour,
+        // the glass surfaces, the drifting titles. It used to sit on a .shell
+        // wrapper that the six-stage restructure removed, which left every one
+        // of those rules matching nothing.
+        className={
+          'app-root'
+          + (ambience ? ' ambient' : '')
+          + (ambience && (!prefersReduced || forceMotion) ? ' eased' : '')
+        }
         data-motion={forceMotion ? 'on' : undefined}
         style={{
           '--accent': accent,

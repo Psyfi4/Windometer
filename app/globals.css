@@ -82,12 +82,15 @@ a { color: var(--accent); }
    contain: any of those would make it the containing block for its fixed
    descendants, and the frame would scroll away with the page instead of
    staying pinned to the window. */
-.shell { min-height: 100vh; }
-
 .main {
   max-width: 1280px;
   margin: 0 auto;
   padding: 1.6rem 2rem 5rem;
+  /* above the fixed backdrop, which sits at z-index 0. This was on a .shell
+     wrapper that no longer exists; without it the content only cleared the
+     backdrop by accident of paint order. */
+  position: relative;
+  z-index: 1;
 }
 
 @media (max-width: 900px) {
@@ -447,7 +450,7 @@ svg text { font-family: var(--body); }
    which keeps text on a calm ground regardless of the frame beneath.
    ==================================================================== */
 
-.shell.ambient { background: transparent; }
+.app-root.ambient { background: transparent; }
 
 .ambient .sidebar {
   background: rgba(16, 24, 32, 0.82);
@@ -475,8 +478,6 @@ svg text { font-family: var(--body); }
 .ambient .main > .grid-15 { text-shadow: 0 1px 10px rgba(6, 10, 14, 0.9); }
 .ambient .eyebrow { text-shadow: 0 1px 8px rgba(6, 10, 14, 0.9); }
 
-/* the main column sits above the backdrop */
-.shell { position: relative; z-index: 1; }
 
 
 
