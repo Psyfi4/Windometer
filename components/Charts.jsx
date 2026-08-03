@@ -225,7 +225,10 @@ export function TimeSeries({ observed, series, times, unit = 'm/s', height = 300
  * at tens of thousands of rows.
  * ------------------------------------------------------------------ */
 
-export function DensityScatter({ x, y, unit = 'm/s', label, rmse, height = 340, bins = 44, maxPoints = 6000 }) {
+// 6000 SVG circles per chart, times one chart per model, all mounted at once
+// was the single largest contributor to a sluggish results page. A scatter
+// this dense reads the same at a third of the points.
+export function DensityScatter({ x, y, unit = 'm/s', label, rmse, height = 340, bins = 44, maxPoints = 2000 }) {
   const T = useChartTheme();
   const w = 460, h = height;
   const iw = w - PAD.l - PAD.r, ih = h - PAD.t - PAD.b;
@@ -528,7 +531,7 @@ export function FitScatter({ x, y, colour, label, unit = 'm/s', fit, height = 33
  * Bland-Altman
  * ------------------------------------------------------------------ */
 
-export function BlandAltman({ meanPair, diff, bias, loaLower, loaUpper, unit = 'm/s', height = 330, maxPoints = 4000 }) {
+export function BlandAltman({ meanPair, diff, bias, loaLower, loaUpper, unit = 'm/s', height = 330, maxPoints = 1500 }) {
   const T = useChartTheme();
   const w = 460, h = height;
   const iw = w - PAD.l - PAD.r, ih = h - PAD.t - PAD.b;
