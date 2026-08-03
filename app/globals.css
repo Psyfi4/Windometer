@@ -710,6 +710,12 @@ svg text { font-family: var(--body); }
     color: var(--breathe-1);
   }
 
+  .app-root:not([data-motion='on']) .ambient h2.stage-title,
+  .app-root:not([data-motion='on']) .ambient .brand h2 {
+    animation: none;
+    background-position: 30% 50%;   /* held mid-drift, still gradient-filled */
+  }
+
   .app-root:not([data-motion='on']) .ambient p,
   .app-root:not([data-motion='on']) .ambient li,
   .app-root:not([data-motion='on']) .ambient .lede,
@@ -1246,4 +1252,49 @@ h2.stage-title {
 .ambient .chip.on {
   animation: none;
   color: var(--on-accent);
+}
+
+
+/* ====================================================================
+   Stage titles
+
+   The same treatment as the mark: a gradient laid through the letterforms
+   and drifted, rather than a solid colour cycling. A gradient reads as
+   light moving across the type; a colour animation reads as the type
+   changing colour. The mark does the former, so the titles should too.
+
+   Built from the station's three stops mirrored — b1 b2 b3 b2 b1 — so the
+   gradient is palindromic and loops without a seam when it drifts.
+
+   Guarded by @supports: where background-clip on text is unavailable the
+   fill would be transparent and the titles would vanish, so those browsers
+   keep the solid breathing colour instead.
+   ==================================================================== */
+
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .ambient h2.stage-title,
+  .ambient .brand h2 {
+    background-image: linear-gradient(
+      100deg,
+      var(--breathe-1) 0%,
+      var(--breathe-2) 25%,
+      var(--breathe-3) 50%,
+      var(--breathe-2) 75%,
+      var(--breathe-1) 100%
+    );
+    background-size: 280% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: titleDrift 13s ease-in-out infinite;
+  }
+
+  /* out of step with the mark's 19 s, so the two are never in lockstep */
+  .ambient .stage:nth-of-type(even) h2.stage-title { animation-delay: -4.4s; }
+  .ambient .stage:nth-of-type(3n) h2.stage-title { animation-delay: -7.9s; }
+}
+
+@keyframes titleDrift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
 }
