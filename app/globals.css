@@ -718,19 +718,9 @@ svg text { font-family: var(--body); }
   /* the mark keeps its gradient; the SMIL slide is withheld in page.jsx */
   .app-root:not([data-motion='on']) .wordmark-svg { animation: none; }
 
-  .app-root:not([data-motion='on']) .ambient p,
-  .app-root:not([data-motion='on']) .ambient li,
-  .app-root:not([data-motion='on']) .ambient .lede,
-  .app-root:not([data-motion='on']) .ambient td,
-  .app-root:not([data-motion='on']) .ambient .chip,
-  .app-root:not([data-motion='on']) .ambient label,
-  .app-root:not([data-motion='on']) .ambient summary,
-  .app-root:not([data-motion='on']) .ambient .caption,
-  .app-root:not([data-motion='on']) .ambient .masthead .sub,
-  .app-root:not([data-motion='on']) .ambient .note-box,
-  .app-root:not([data-motion='on']) .ambient .card .note {
-    animation: none;
-  }
+  /* one animation now drives the inherited colours, so stopping it settles
+     every piece of text that reads from them */
+  .app-root:not([data-motion='on']) .ambient .main { animation: none; }
 
   .app-root:not([data-motion='on']) .backdrop svg g {
     animation-play-state: paused;
@@ -974,6 +964,12 @@ svg text { font-family: var(--body); }
   min-height: 100vh;
   min-height: 100dvh;
   scroll-snap-align: start;
+  /* Every chosen output renders at once now that the tabs are gone, so a full
+     results page holds every chart simultaneously. This lets the browser skip
+     layout and paint for stages that are off screen; the intrinsic size keeps
+     the scrollbar honest while they are skipped. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1170,23 +1166,50 @@ h2.stage-title {
    Durations are staggered and coprime so nothing pulses in lockstep.
    ==================================================================== */
 
+/* --ink and --muted are registered so they can be animated, and animated on
+   one element rather than on thousands.
+
+   The previous approach put an animation on every div and span in the main
+   column so that text carrying an inline colour would breathe. On a results
+   page that is thousands of independent animations, each forcing a repaint of
+   its element every frame — colour cannot be composited on the GPU. Animating
+   the two inherited variables instead means one animation, and everything
+   reading var(--ink) or var(--muted), inline styles included, follows it. */
+@property --ink {
+  syntax: '<color>';
+  initial-value: #f5ecf7;
+  inherits: true;
+}
+
+@property --muted {
+  syntax: '<color>';
+  initial-value: #ab8fb5;
+  inherits: true;
+}
+
+.ambient .main {
+  animation: inheritedBreathe 19s ease-in-out infinite;
+}
+
+@keyframes inheritedBreathe {
+  0%, 100% {
+    --ink: color-mix(in srgb, var(--breathe-1) 62%, #f5ecf7);
+    --muted: color-mix(in srgb, var(--breathe-1) 58%, #ab8fb5);
+  }
+  33% {
+    --ink: color-mix(in srgb, var(--breathe-2) 62%, #f5ecf7);
+    --muted: color-mix(in srgb, var(--breathe-2) 58%, #ab8fb5);
+  }
+  66% {
+    --ink: color-mix(in srgb, var(--breathe-3) 62%, #f5ecf7);
+    --muted: color-mix(in srgb, var(--breathe-3) 58%, #ab8fb5);
+  }
+}
+
 @keyframes breatheText {
   0%, 100% { color: var(--breathe-1); }
   33%      { color: var(--breathe-2); }
   66%      { color: var(--breathe-3); }
-}
-
-/* the same cycle, held closer to the resting ink so long text stays calm */
-@keyframes breatheProse {
-  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 78%, var(--ink)); }
-  33%      { color: color-mix(in srgb, var(--breathe-2) 78%, var(--ink)); }
-  66%      { color: color-mix(in srgb, var(--breathe-3) 78%, var(--ink)); }
-}
-
-@keyframes breatheMuted {
-  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 66%, var(--muted)); }
-  33%      { color: color-mix(in srgb, var(--breathe-2) 66%, var(--muted)); }
-  66%      { color: color-mix(in srgb, var(--breathe-3) 66%, var(--muted)); }
 }
 
 /* display type and labels — full swing */
@@ -1214,43 +1237,6 @@ h2.stage-title {
 .ambient thead th { animation-delay: -5.1s; }
 .ambient .stage-index { animation-delay: -6.7s; }
 .ambient .scroll-hint { animation-delay: -8.3s; }
-
-/* Most text in the results sits in divs and spans carrying inline colours,
-   not in paragraphs, so listing block elements alone missed nearly all of it.
-   :where() keeps this at zero specificity, so the tiered rules below still
-   win for the elements they name. Animations outrank inline styles in the
-   cascade, so the inline colours are no obstacle. */
-.ambient :where(.main div, .main span, .main strong, .main b, .main em, .main code) {
-  animation: breatheProse 17s ease-in-out infinite;
-}
-
-/* prose — narrower swing, slower */
-.ambient p,
-.ambient li,
-.ambient .lede,
-.ambient td,
-.ambient .chip,
-.ambient label,
-.ambient summary {
-  animation: breatheProse 17s ease-in-out infinite;
-}
-
-.ambient li { animation-delay: -3.7s; }
-.ambient td { animation-delay: -6.1s; }
-.ambient .chip { animation-delay: -2.9s; }
-
-/* the quiet supporting text, quieter still */
-.ambient .caption,
-.ambient .masthead .sub,
-.ambient .note-box,
-.ambient .card .note,
-.ambient .drop .small,
-.ambient .picker-card .b {
-  animation: breatheMuted 23s ease-in-out infinite;
-}
-
-.ambient .card .note { animation-delay: -5.3s; }
-.ambient .note-box { animation-delay: -9.7s; }
 
 /* Anything sitting on a filled accent keeps its fixed dark ink — the text is
    on the colour, not made of it. */
