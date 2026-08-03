@@ -288,8 +288,19 @@ export default function Page() {
                 >
                   <defs>
                     {/* Vertical, like the logo it is sampled from: the V and
-                        the I run indigo at the top down to amber at the foot. */}
-                    <linearGradient id="wmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                        the I run indigo at the top down to amber at the foot.
+
+                        spreadMethod="reflect" repeats the ramp mirrored beyond
+                        its ends, so translating the gradient slides new colour
+                        through the letters without ever leaving the nine
+                        sampled stops. The filter that used to do this rotated
+                        hue through a full turn, which necessarily passed
+                        through greens and cyans the logo has none of. */}
+                    <linearGradient
+                      id="wmGrad"
+                      x1="0%" y1="0%" x2="0%" y2="100%"
+                      spreadMethod="reflect"
+                    >
                       <stop offset="0%" stopColor="#4D62D5" />
                       <stop offset="12.5%" stopColor="#7A40C8" />
                       <stop offset="25%" stopColor="#B62FC7" />
@@ -299,6 +310,18 @@ export default function Page() {
                       <stop offset="75%" stopColor="#F27B75" />
                       <stop offset="87.5%" stopColor="#F79262" />
                       <stop offset="100%" stopColor="#F5B35E" />
+                      {ambience && (!prefersReduced || forceMotion) && (
+                        // two bbox heights is one full period of a reflected
+                        // ramp, so the slide loops with no visible seam
+                        <animateTransform
+                          attributeName="gradientTransform"
+                          type="translate"
+                          from="0 0"
+                          to="0 2"
+                          dur="17s"
+                          repeatCount="indefinite"
+                        />
+                      )}
                     </linearGradient>
                   </defs>
                   <text
