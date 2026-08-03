@@ -642,36 +642,53 @@ function Wordmark({ ambience, moving }) {
   useEffect(() => {
     const node = textRef.current;
     if (!node) return undefined;
+    let live = true;
+    let tries = 0;
 
     const fit = () => {
+      if (!live) return false;
+      let b = null;
       try {
-        const b = node.getBBox();
-        if (b.width > 0 && b.height > 0) {
-          const padX = b.width * 0.012;   // a hair of air so the ends do not clip
-          setBox({
-            x: b.x - padX,
-            y: b.y,
-            w: b.width + padX * 2,
-            h: b.height,
-          });
-        }
+        b = node.getBBox();
       } catch {
-        // getBBox throws while the element is not being rendered; the resize
-        // and font-ready callbacks below will catch it once it is
+        // getBBox throws while the element is not being rendered
       }
+      if (!b || b.width <= 1 || b.height <= 1) return false;
+      const padX = b.width * 0.012;   // a hair of air so the ends do not clip
+      setBox({ x: b.x - padX, y: b.y, w: b.width + padX * 2, h: b.height });
+      return true;
     };
 
-    fit();
-    // the first measurement lands on the fallback face, so measure again once
-    // the webfont has actually loaded
+    // Keep asking until the text has actually been laid out.
+    //
+    // A single attempt on mount is not enough. getBBox returns nothing while
+    // the subtree has yet to be laid out, and content-visibility: auto on the
+    // stages can leave it skipped at exactly that moment. Nor is one retry on
+    // fonts.ready: a cached font resolves that promise before first layout, so
+    // the retry lands just as early as the original.
+    const attempt = () => {
+      if (fit()) return;
+      tries += 1;
+      if (tries < 60) requestAnimationFrame(attempt);   // about a second
+    };
+    requestAnimationFrame(attempt);
+
+    // and once more when the real font arrives, since its metrics differ from
+    // whatever fallback the first measurement caught
     if (typeof document !== 'undefined' && document.fonts?.ready) {
-      document.fonts.ready.then(fit).catch(() => {});
+      document.fonts.ready
+        .then(() => requestAnimationFrame(fit))
+        .catch(() => {});
     }
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
-    if (ro && node.parentNode) ro.observe(node.parentNode);
+
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => fit())
+      : null;
+    if (ro) ro.observe(node);
     window.addEventListener('resize', fit);
 
     return () => {
+      live = false;
       window.removeEventListener('resize', fit);
       if (ro) ro.disconnect();
     };
@@ -681,7 +698,12 @@ function Wordmark({ ambience, moving }) {
     <div className="hero-mark">
       <svg
         className="wordmark-svg"
-        viewBox={box ? `${box.x} ${box.y} ${box.w} ${box.h}` : '0 0 1000 200'}
+        // The fallback is only on screen for the frame or two before the real
+        // measurement lands, but it should still be close: 940x140 is roughly
+        // what WINDLAB measures at font-size 190, where the old 1000x200 left
+        // 8% of dead space to its right and 60 units of it below the baseline —
+        // which is exactly how the mark came to sit left of centre and high.
+        viewBox={box ? `${box.x} ${box.y} ${box.w} ${box.h}` : '0 20 940 142'}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Windlab"

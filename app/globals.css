@@ -991,6 +991,11 @@ svg text { font-family: var(--body); }
    line, because the two lines of text below it take up room and push it up.
    Balancing the stage against the height of that text puts the mark itself
    on the centre line, which is what reads as centred. */
+/* The opening stage is never off screen at load, so skipping it buys nothing
+   and costs the mark its measurement — getBBox cannot measure a subtree the
+   browser has skipped. */
+.stage.hero { content-visibility: visible; }
+
 .stage.hero {
   align-items: center;
   text-align: center;
