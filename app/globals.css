@@ -38,10 +38,6 @@
   --accent: #5fd3c4;
   --on-accent: #08100e;
   --frame-w: 5px;
-  /* Height of the text that hangs below the mark on the opening stage. The
-     hero is padded by this so the mark itself lands on the centre line rather
-     than the midpoint of the whole stack. Raise it to push the mark down. */
-  --hero-below: 8.5rem;
   --violet: #9d8ce0;
   --amber: #e3a857;
   --coral: #e56c73;
@@ -1000,8 +996,25 @@ svg text { font-family: var(--body); }
   align-items: center;
   text-align: center;
   justify-content: center;
-  padding-top: calc(5rem + var(--hero-below, 8.5rem));
-  padding-bottom: 5rem;
+  padding: 5rem 0;
+}
+
+/* The mark alone decides where the centre is.
+
+   Centring the whole stack puts the *group's* midpoint on the centre line,
+   which leaves the mark floating above it by half the height of whatever
+   hangs below. Compensating with a fixed padding — which is what this used to
+   do — only works at one viewport width, because the text below rewraps and
+   changes height as the window changes.
+
+   Giving the caption no height takes it out of the calculation entirely. The
+   flex centring then sees the mark and nothing else, so the mark lands on the
+   centre line exactly, at any size; the caption still paints, immediately
+   beneath it, because the overflow is visible. */
+.stage.hero .hero-caption {
+  height: 0;
+  overflow: visible;
+  width: 100%;
 }
 
 .stage.hero .stage-inner {
@@ -1016,6 +1029,7 @@ svg text { font-family: var(--body); }
 }
 .stage.hero .hero-lede { margin-left: auto; margin-right: auto; }
 .stage.hero .wordmark-sub { margin-top: 1.9rem; }
+.stage.hero .hero-lede { margin-top: 1.4rem; }
 
 .stage-inner { width: 100%; }
 

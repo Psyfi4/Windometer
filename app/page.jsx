@@ -408,11 +408,14 @@ export default function Page() {
             <div className="stage-index">01 — Windlab</div>
             <div className="stage-inner">
               <Wordmark ambience={ambience} moving={!prefersReduced || forceMotion} />
-              <div className="wordmark-sub">Wind forecasting workbench</div>
-              <p className="hero-lede">
-                Fifteen machine-learning models on your own wind record.
-                Trained in this tab, on your machine, with nothing sent anywhere.
-              </p>
+              {/* Taken out of the centring calculation — see .hero-caption. */}
+              <div className="hero-caption">
+                <div className="wordmark-sub">Wind forecasting workbench</div>
+                <p className="hero-lede">
+                  Fifteen machine-learning models on your own wind record.
+                  Trained in this tab, on your machine, with nothing sent anywhere.
+                </p>
+              </div>
             </div>
             <div className="scroll-hint">Scroll</div>
           </section>
