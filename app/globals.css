@@ -708,7 +708,9 @@ svg text { font-family: var(--body); }
 
   .app-root:not([data-motion='on']) .ambient h2.stage-title,
   .app-root:not([data-motion='on']) .ambient .brand h2,
-  .app-root:not([data-motion='on']) .ambient .btn:not(:disabled) {
+  .app-root:not([data-motion='on']) .ambient .btn:not(:disabled),
+  .app-root:not([data-motion='on']) .ambient .seg button.on,
+  .app-root:not([data-motion='on']) .ambient .chip.on {
     animation: none;
     background-position: 30% 50%;   /* held mid-drift, still gradient-filled */
   }
@@ -1259,11 +1261,17 @@ h2.stage-title {
   color: var(--on-accent);
 }
 
-/* The primary action radiates, but only across the station's own bracket —
-   the working surfaces identify the station, while the titles above keep the
-   full ramp. Segmented controls and chips stay flat: a dozen small elements
-   all shimmering at once reads as noise rather than as one thing breathing. */
-.ambient .btn:not(:disabled) {
+/* Every filled control radiates across the station's own bracket — the
+   working surfaces identify the station, while the titles above keep the
+   full ramp.
+
+   Durations differ per control type and delays are staggered inside each
+   group. Left identical, a dozen small filled elements would sweep in
+   lockstep and read as the whole panel flashing rather than as separate
+   things breathing. */
+.ambient .btn:not(:disabled),
+.ambient .seg button.on,
+.ambient .chip.on {
   background-image: linear-gradient(
     100deg,
     var(--breathe-1) 0%,
@@ -1276,6 +1284,19 @@ h2.stage-title {
   animation: btnDrift 9s ease-in-out infinite;
   color: var(--on-accent);
 }
+
+.ambient .seg button.on { animation-duration: 11s; }
+.ambient .chip.on { animation-duration: 13s; }
+
+/* segmented controls, by their position across the deck row */
+.ambient .field:nth-of-type(2) .seg button.on { animation-delay: -2.3s; }
+.ambient .field:nth-of-type(3) .seg button.on { animation-delay: -4.7s; }
+.ambient .field:nth-of-type(4) .seg button.on { animation-delay: -7.1s; }
+
+/* selected model chips, by their position in the row */
+.ambient .chips .chip.on:nth-of-type(2n) { animation-delay: -3.7s; }
+.ambient .chips .chip.on:nth-of-type(3n) { animation-delay: -6.3s; }
+.ambient .chips .chip.on:nth-of-type(5n) { animation-delay: -9.1s; }
 
 @keyframes btnDrift {
   0%, 100% { background-position: 0% 50%; }
