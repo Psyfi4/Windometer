@@ -29,6 +29,10 @@ import { themeForSite, chartTheme, PALETTE, SITE_THEMES } from '@/lib/theme';
 import * as Theme from '@/lib/theme';
 import Backdrop from '@/components/Backdrop';
 import { useSmoothScroll } from '@/lib/useSmoothScroll';
+import {
+  buildRecord, compareRuns, compareWeibull, summarise,
+  compareAcross, summariseAcross, COMPARABLE_METRICS,
+} from '@/lib/compare';
 import { Eyebrow, Note, Card, CardCI, CardRow, Table, Legend3 } from '@/components/ui';
 
 const HUB_HEIGHTS = [100, 120, 150];
@@ -38,6 +42,7 @@ const OUTPUTS = [
   { key: 'Models', title: 'Per model', blurb: 'One model at a time: accuracy, agreement, extreme-wind behaviour, which lags it leans on.' },
   { key: 'Weibull', title: 'Weibull & power', blurb: 'Shape and scale by the MEPF method, power density at 100, 120 and 150 m.' },
   { key: 'Region', title: 'Region', blurb: 'Where the record comes from, and the other stations in the study.' },
+  { key: 'Compare', title: 'Across datasets', blurb: 'Set this run against one saved earlier: per-model deltas, whether the ordering holds between the two records, and the resource assessments side by side.' },
   { key: 'Export', title: 'Export', blurb: 'Metrics, predictions and tables as CSV, plus the exact run settings.' },
 ];
 
@@ -76,6 +81,12 @@ export default function Page() {
   const scrollerRef = useRef(null);
   const [prefersReduced, setPrefersReduced] = useState(false);
   const [forceMotion, setForceMotion] = useState(false);
+
+  // the run library, held in the browser
+  const [library, setLibrary] = useState([]);
+  const [baselineId, setBaselineId] = useState(null);
+  const [libMsg, setLibMsg] = useState(null);
+  const [libBusy, setLibBusy] = useState(false);
 
   const preset = MM.PRESETS[presetName];
   const stationTheme = themeForSite(site);
@@ -136,6 +147,17 @@ export default function Page() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
+
+  const refreshLibrary = useCallback(async () => {
+    try {
+      const store = await import('@/lib/store');
+      setLibrary(await store.listRuns());
+    } catch (err) {
+      setLibMsg(err?.message || 'The run library is unavailable in this browser.');
+    }
+  }, []);
+
+  useEffect(() => { refreshLibrary(); }, [refreshLibrary]);
 
   /* ------------------------------ features --------------------------- */
   const features = useMemo(() => {
@@ -200,6 +222,26 @@ export default function Page() {
     }
   }, [features, selected, preset, topK]);
 
+  const saveCurrentRun = useCallback(async (label) => {
+    if (!Object.keys(evals).length) return;
+    setLibBusy(true);
+    setLibMsg(null);
+    try {
+      const store = await import('@/lib/store');
+      const record = buildRecord({
+        file, dataset, site, unit, presetName, preset, testSize, topK,
+        board: boardRef.current, evals, results, weibull, label,
+      });
+      await store.saveRun(record);
+      await refreshLibrary();
+      setLibMsg(`Saved “${record.label}” to the library.`);
+    } catch (err) {
+      setLibMsg(err?.message || 'Could not save that run.');
+    } finally {
+      setLibBusy(false);
+    }
+  }, [evals, results, file, dataset, site, unit, presetName, preset, testSize, topK, weibull, refreshLibrary]);
+
   /* ------------------------------ derived ---------------------------- */
   const board = useMemo(() => {
     const rows = Object.entries(evals).map(([name, ev]) => ({
@@ -211,6 +253,10 @@ export default function Page() {
     }));
     return rows.sort((a, b) => a.rmse - b.rmse);
   }, [evals, results]);
+
+  // saveCurrentRun is declared above board, so it reads it through a ref
+  const boardRef = useRef([]);
+  boardRef.current = board;
 
   const bestModel = board[0]?.Model ?? null;
   const failures = Object.values(results).filter((r) => r.failed);
@@ -497,6 +543,17 @@ export default function Page() {
                   />
                 )}
                 {o.key === 'Region' && <RegionTab site={site} lat={lat} lon={lon} />}
+                {o.key === 'Compare' && (
+                  <CompareTab
+                    board={board} evals={evals} library={library}
+                    baselineId={baselineId} setBaselineId={setBaselineId}
+                    saveCurrentRun={saveCurrentRun} refreshLibrary={refreshLibrary}
+                    libMsg={libMsg} setLibMsg={setLibMsg} libBusy={libBusy}
+                    file={file} dataset={dataset} site={site} weibull={weibull}
+                    unit={unit} presetName={presetName} preset={preset}
+                    testSize={testSize} topK={topK} results={results}
+                  />
+                )}
                 {o.key === 'Export' && (
                   <ExportTab
                     board={board} results={results} evals={evals} features={features}
@@ -1412,6 +1469,358 @@ function RegionTab({ site, lat, lon }) {
           station: name, region: m.region, terrain: m.terrain, lat: m.lat, lon: m.lon,
         }))}
       />
+    </>
+  );
+}
+
+/* ==================================================================== *
+ * Across datasets
+ *
+ * Saved runs live in the browser (see lib/store.js). This is where one gets
+ * chosen as a baseline and set against the run on screen.
+ * ==================================================================== */
+
+function CompareTab(props) {
+  const {
+    board, evals, library, baselineId, setBaselineId,
+    saveCurrentRun, refreshLibrary, libMsg, setLibMsg, libBusy,
+    file, dataset, site, weibull, unit, presetName, preset, testSize, topK, results,
+  } = props;
+
+  const [metric, setMetric] = useState('rmse');
+  const [mode, setMode] = useState('pair');
+  const [label, setLabel] = useState('');
+  const fileRef = useRef(null);
+
+  const hasResults = Object.keys(evals).length > 0;
+
+  const current = useMemo(() => {
+    if (!hasResults) return null;
+    return buildRecord({
+      file, dataset, site, unit, presetName, preset, testSize, topK,
+      board, evals, results, weibull, label: label || file?.name,
+    });
+  }, [hasResults, file, dataset, site, unit, presetName, preset, testSize, topK,
+    board, evals, results, weibull, label]);
+
+  const baseline = library.find((r) => r.id === baselineId) ?? null;
+  const cmp = (current && baseline) ? compareRuns(current, baseline, metric) : null;
+  const wcmp = (current && baseline) ? compareWeibull(current, baseline) : null;
+
+  // every saved record, plus the one on screen if it has not been saved yet
+  const allRecords = useMemo(() => {
+    const saved = [...library].sort((a, b) => a.savedAt - b.savedAt);
+    return current ? [...saved, { ...current, label: `${current.label} (this run)` }] : saved;
+  }, [library, current]);
+  const across = allRecords.length >= 2 ? compareAcross(allRecords, metric) : null;
+
+  const remove = async (id) => {
+    const store = await import('@/lib/store');
+    await store.deleteRun(id);
+    if (baselineId === id) setBaselineId(null);
+    await refreshLibrary();
+  };
+
+  const doExport = async () => {
+    const store = await import('@/lib/store');
+    download('windlab-library.json', await store.exportAll(), 'application/json');
+  };
+
+  const doImport = async (f) => {
+    if (!f) return;
+    try {
+      const store = await import('@/lib/store');
+      const { added, skipped } = await store.importAll(await f.text());
+      await refreshLibrary();
+      setLibMsg(`Imported ${added} run${added === 1 ? '' : 's'}`
+        + (skipped ? `, skipped ${skipped} already present.` : '.'));
+    } catch (err) {
+      setLibMsg(err?.message || 'Could not read that file.');
+    }
+  };
+
+  return (
+    <>
+      <Eyebrow>The library</Eyebrow>
+      <Note>
+        Saved runs live in <b>this browser</b>. There is no server behind the site, which
+        is what lets a long record train at all — so a run stays on the machine that
+        produced it, and clearing site data removes it. Export writes the whole library
+        to a JSON file you can archive or move to another machine.
+      </Note>
+
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
+        <input
+          type="text" value={label} placeholder={file?.name ?? 'Label for this run'}
+          onChange={(e) => setLabel(e.target.value)}
+          style={{ maxWidth: 260 }} aria-label="Label for this run"
+        />
+        <button className="btn" style={{ width: 'auto', padding: '0.5rem 1.4rem' }}
+          disabled={!hasResults || libBusy} onClick={() => saveCurrentRun(label)}>
+          {libBusy ? 'Saving…' : 'Save this run'}
+        </button>
+        <button className="btn-ghost" onClick={doExport} disabled={!library.length}>
+          Export library
+        </button>
+        <button className="btn-ghost" onClick={() => fileRef.current?.click()}>Import</button>
+        <input ref={fileRef} type="file" accept="application/json,.json"
+          style={{ display: 'none' }} onChange={(e) => doImport(e.target.files?.[0])} />
+      </div>
+
+      {libMsg && <Note tone="teal">{libMsg}</Note>}
+
+      {!hasResults && (
+        <div className="empty">Run some models first — then this run can be saved or compared.</div>
+      )}
+
+      <Eyebrow>Saved runs</Eyebrow>
+      {library.length === 0 ? (
+        <div className="empty">Nothing saved yet. Run a dataset, save it, then upload another to compare.</div>
+      ) : (
+        <div className="picker">
+          {library.map((r) => (
+            <button
+              key={r.id}
+              className={`picker-card${baselineId === r.id ? ' on' : ''}`}
+              onClick={() => setBaselineId(baselineId === r.id ? null : r.id)}
+            >
+              <span className="mark" />
+              <span className="t">{r.label}</span>
+              <span className="b">
+                {r.station === 'auto' ? 'Custom site' : r.station}
+                {r.file?.hours ? ` · ${fmtInt(r.file.hours)} h` : ''}
+                {r.file?.startYear ? ` · ${r.file.startYear}–${r.file.endYear}` : ''}
+                <br />
+                {Object.keys(r.models ?? {}).length} models · {r.preset} ·{' '}
+                {new Date(r.savedAt).toLocaleDateString()}
+                <br />
+                <span
+                  role="button" tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); remove(r.id); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); remove(r.id); } }}
+                  style={{ color: 'var(--coral, #F27B75)', cursor: 'pointer' }}
+                >
+                  Delete
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {(cmp || across) && (
+        <>
+          <Eyebrow>Compare</Eyebrow>
+          <div className="seg" style={{ maxWidth: 420, marginBottom: '0.9rem' }}>
+            <button className={mode === 'pair' ? 'on' : ''} onClick={() => setMode('pair')}>
+              Against one record
+            </button>
+            <button className={mode === 'all' ? 'on' : ''} onClick={() => setMode('all')}>
+              Across all {allRecords.length}
+            </button>
+          </div>
+          <div className="seg" style={{ maxWidth: 620, marginBottom: '0.9rem' }}>
+            {COMPARABLE_METRICS.slice(0, 4).map((m) => (
+              <button key={m.key} className={metric === m.key ? 'on' : ''}
+                onClick={() => setMetric(m.key)}>{m.label}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {mode === 'all' && across && (
+        <>
+          <Eyebrow>Every model across every record</Eyebrow>
+          <CardRow>
+            <Card label="Records" value={across.records.length} />
+            <Card label="Models ranked" value={across.rows.length}
+              note={across.excluded.length ? `${across.excluded.length} not in every record` : 'present in all'} />
+            <Card label="Best mean rank" value={across.rows[0]?.model ?? '—'} tone="t-teal" />
+            <Card label="Rank agreement" value={Number.isFinite(across.kendallW) ? across.kendallW.toFixed(2) : '—'}
+              note="Kendall's W" tone="t-amber" />
+          </CardRow>
+
+          <div style={{ marginTop: '0.9rem' }}>
+            <Note>
+              {summariseAcross(across)} W is the many-record form of the pairwise tau: it
+              asks whether all the records put the models in the same order, which is the
+              question the pooled analysis in the study is answering across its stations.
+            </Note>
+          </div>
+
+          {across.excluded.length > 0 && (
+            <div style={{ marginTop: '0.8rem' }}>
+              <Note tone="coral">
+                Left out of the ranking, because they did not run on every record:{' '}
+                {across.excluded.map((e) => `${e.model} (${e.present}/${e.of})`).join(', ')}.
+                Ranking a model that only ran on some of the sites against ones that ran on
+                all of them would put a number on something never measured.
+              </Note>
+            </div>
+          )}
+
+          <Eyebrow>{across.meta.label} by record</Eyebrow>
+          <Table
+            columns={[
+              { key: 'model', label: 'Model' },
+              { key: 'kind', label: 'Type' },
+              ...across.records.map((r, i) => ({ key: `r${i}`, label: r, digits: across.meta.digits })),
+              { key: 'meanRank', label: 'Mean rank', digits: 2 },
+              { key: 'bestCount', label: 'Best on', digits: 0 },
+              { key: 'spread', label: 'Rank spread', digits: 0 },
+            ]}
+            rows={across.rows.map((r) => ({
+              model: r.model, kind: r.kind,
+              ...Object.fromEntries(r.values.map((v, i) => [`r${i}`, v])),
+              meanRank: r.meanRank, bestCount: r.bestCount, spread: r.spread,
+            }))}
+            bestColumn="meanRank"
+          />
+          <div className="caption">
+            Rank spread is the gap between a model's best and worst placing. A low mean
+            rank with a high spread is a model that wins somewhere and fails elsewhere —
+            worth more suspicion than one that is steadily second.
+          </div>
+
+          <Eyebrow>Each model on each record</Eyebrow>
+          <GroupedBars
+            categories={across.rows.map((r) => r.model)}
+            yLabel={across.meta.label}
+            groups={across.records.map((name, i) => ({
+              label: name,
+              colour: PALETTE.teal,
+              values: across.rows.map((r) => r.values[i]),
+            }))}
+            height={400}
+          />
+
+          <Eyebrow>How steadily each model places</Eyebrow>
+          <MultiLine
+            categories={across.records}
+            yLabel="Rank (0 is best)"
+            series={across.rows.map((r, i) => ({
+              label: r.model,
+              colour: [PALETTE.teal, PALETTE.amber, PALETTE.violet, PALETTE.coral,
+                PALETTE.steel, PALETTE.ink][i % 6],
+              values: r.ranks,
+            }))}
+            height={340}
+          />
+          <div className="caption">
+            Flat lines mean a model holds its place from record to record. Lines that
+            cross mean the ordering is site-specific, and a pooled ranking would be
+            hiding more than it shows.
+          </div>
+        </>
+      )}
+
+      {mode === 'pair' && cmp && (
+        <>
+          <Eyebrow>This run against {baseline.label}</Eyebrow>
+          <CardRow>
+            <Card label="Models in common" value={cmp.shared.length}
+              note={cmp.onlyCurrent.length || cmp.onlyBaseline.length
+                ? `${cmp.onlyCurrent.length} only here, ${cmp.onlyBaseline.length} only there`
+                : 'both runs used the same set'} />
+            <Card label="Better here" value={cmp.improved} tone="t-teal" />
+            <Card label="Worse here" value={cmp.worsened} tone="t-coral" />
+            <Card label="Rank agreement" value={Number.isFinite(cmp.tau) ? cmp.tau.toFixed(2) : '—'}
+              note="Kendall's tau" tone="t-amber" />
+          </CardRow>
+
+          <div style={{ marginTop: '0.9rem' }}>
+            <Note>
+              {summarise(cmp)} Rank agreement matters more than the raw numbers here: wind
+              records differ in how predictable they are, so a model can post a worse score
+              at one site and still be the better model. A tau near 1 means the ordering
+              carries across both records.
+            </Note>
+          </div>
+
+          <Eyebrow>Per model</Eyebrow>
+          <Table
+            columns={[
+              { key: 'model', label: 'Model' },
+              { key: 'kind', label: 'Type' },
+              { key: 'current', label: 'This run', digits: cmp.meta.digits },
+              { key: 'baseline', label: baseline.label, digits: cmp.meta.digits },
+              { key: 'delta', label: 'Difference', digits: cmp.meta.digits },
+              { key: 'pct', label: 'Change %', digits: 1 },
+            ]}
+            rows={cmp.rows}
+            bestColumn="current"
+            bestDirection={cmp.meta.lowerIsBetter ? 'min' : 'max'}
+          />
+
+          <Eyebrow>{cmp.meta.label} on both records</Eyebrow>
+          <GroupedBars
+            categories={cmp.rows.map((r) => r.model)}
+            yLabel={cmp.meta.label}
+            groups={[
+              { label: 'This run', colour: PALETTE.teal, values: cmp.rows.map((r) => r.current) },
+              { label: baseline.label, colour: PALETTE.amber, values: cmp.rows.map((r) => r.baseline) },
+            ]}
+            height={380}
+          />
+
+          <Eyebrow>Ordering</Eyebrow>
+          <FitScatter
+            x={cmp.rows.map((r) => r.baseline)}
+            y={cmp.rows.map((r) => r.current)}
+            colour={PALETTE.teal}
+            label="This run"
+            unit=""
+            fit={W.linearFit(cmp.rows.map((r) => r.baseline), cmp.rows.map((r) => r.current))}
+          />
+          <div className="caption">
+            Each point is one model: its score on the baseline against its score here.
+            Points on a rising line mean the two records agree about which models are
+            strong; scatter means the ranking does not transfer.
+          </div>
+
+          {wcmp && (
+            <>
+              <Eyebrow>Wind resource, side by side</Eyebrow>
+              <Table
+                columns={[
+                  { key: 'name', label: '' },
+                  { key: 'current', label: 'This run', digits: 3 },
+                  { key: 'baseline', label: baseline.label, digits: 3 },
+                ]}
+                rows={wcmp.scalars.map(([name, a, b]) => ({ name, current: a, baseline: b }))}
+              />
+              <div style={{ marginTop: '1rem' }}>
+                <GroupedBars
+                  categories={wcmp.heights.map((h) => `${h.height} m`)}
+                  yLabel="Wind power density (W/m²)"
+                  groups={[
+                    { label: 'This run', colour: PALETTE.teal, values: wcmp.heights.map((h) => h.currentWpd) },
+                    { label: baseline.label, colour: PALETTE.amber, values: wcmp.heights.map((h) => h.baselineWpd) },
+                  ]}
+                  height={320}
+                />
+              </div>
+              {wcmp.monthly.length > 0 && (
+                <div style={{ marginTop: '1.2rem' }}>
+                  <Eyebrow>Monthly power density at 150 m</Eyebrow>
+                  <MultiLine
+                    categories={wcmp.monthly.map((m) => m.month)}
+                    yLabel="WPD (W/m²)"
+                    series={[
+                      { label: 'This run', colour: PALETTE.teal, values: wcmp.monthly.map((m) => m.current) },
+                      { label: baseline.label, colour: PALETTE.amber, values: wcmp.monthly.map((m) => m.baseline) },
+                    ]}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {hasResults && library.length > 0 && !baseline && (
+        <div className="empty">Pick a saved run above to compare this one against.</div>
+      )}
     </>
   );
 }
