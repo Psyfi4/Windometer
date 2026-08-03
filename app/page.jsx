@@ -287,15 +287,18 @@ export default function Page() {
                   aria-label="Windlab"
                 >
                   <defs>
-                    <linearGradient id="wmGrad" x1="0%" y1="0%" x2="100%" y2="12%">
-                      <stop offset="0%" stopColor="#FFB300" />
-                      <stop offset="14%" stopColor="#FF7A18" />
-                      <stop offset="28%" stopColor="#FF3B30" />
-                      <stop offset="42%" stopColor="#FF4D9D" />
-                      <stop offset="56%" stopColor="#D926E8" />
-                      <stop offset="70%" stopColor="#8B5CF6" />
-                      <stop offset="84%" stopColor="#22D3EE" />
-                      <stop offset="100%" stopColor="#16E0C4" />
+                    {/* Vertical, like the logo it is sampled from: the V and
+                        the I run indigo at the top down to amber at the foot. */}
+                    <linearGradient id="wmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#4D62D5" />
+                      <stop offset="12.5%" stopColor="#7A40C8" />
+                      <stop offset="25%" stopColor="#B62FC7" />
+                      <stop offset="37.5%" stopColor="#E634C7" />
+                      <stop offset="50%" stopColor="#F051B0" />
+                      <stop offset="62.5%" stopColor="#F5699A" />
+                      <stop offset="75%" stopColor="#F27B75" />
+                      <stop offset="87.5%" stopColor="#F79262" />
+                      <stop offset="100%" stopColor="#F5B35E" />
                     </linearGradient>
                   </defs>
                   <text

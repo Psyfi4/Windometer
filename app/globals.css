@@ -21,14 +21,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --ground: #08060f;
-  --surface: #100c1c;
-  --raised: #171126;
-  --line: #2a2040;
-  --line-soft: #1d1631;
-  --ink: #f0ecfa;
-  --muted: #9b8fb8;
-  --dim: #6b5f88;
+  /* Ground and surfaces pulled toward the outline purple sampled off the
+     logo (#4A0257), so the ramp sits on related ink rather than neutral grey. */
+  --ground: #0a0410;
+  --surface: #14081c;
+  --raised: #1c0d26;
+  --line: #33153d;
+  --line-soft: #250f2d;
+  --ink: #f5ecf7;
+  --muted: #ab8fb5;
+  --dim: #7a5f85;
 
   --teal: #5fd3c4;
   /* Station accent. Overridden inline per station; everything in the
@@ -689,6 +691,39 @@ svg text { font-family: var(--body); }
     filter: saturate(1.9) brightness(1.12);
   }
 
+  /* Text settles on the station's own colour instead of cycling. The type
+     stays coloured — only the movement stops. */
+  .app-root:not([data-motion='on']) .ambient h1,
+  .app-root:not([data-motion='on']) .ambient h2,
+  .app-root:not([data-motion='on']) .ambient h3,
+  .app-root:not([data-motion='on']) .ambient h4,
+  .app-root:not([data-motion='on']) .ambient .mark,
+  .app-root:not([data-motion='on']) .ambient .eyebrow,
+  .app-root:not([data-motion='on']) .ambient .lab,
+  .app-root:not([data-motion='on']) .ambient .stage-index,
+  .app-root:not([data-motion='on']) .ambient .wordmark-sub,
+  .app-root:not([data-motion='on']) .ambient .scroll-hint,
+  .app-root:not([data-motion='on']) .ambient .picker-card .t,
+  .app-root:not([data-motion='on']) .ambient .card .val,
+  .app-root:not([data-motion='on']) .ambient thead th {
+    animation: none;
+    color: var(--breathe-1);
+  }
+
+  .app-root:not([data-motion='on']) .ambient p,
+  .app-root:not([data-motion='on']) .ambient li,
+  .app-root:not([data-motion='on']) .ambient .lede,
+  .app-root:not([data-motion='on']) .ambient td,
+  .app-root:not([data-motion='on']) .ambient .chip,
+  .app-root:not([data-motion='on']) .ambient label,
+  .app-root:not([data-motion='on']) .ambient summary,
+  .app-root:not([data-motion='on']) .ambient .caption,
+  .app-root:not([data-motion='on']) .ambient .masthead .sub,
+  .app-root:not([data-motion='on']) .ambient .note-box,
+  .app-root:not([data-motion='on']) .ambient .card .note {
+    animation: none;
+  }
+
   .app-root:not([data-motion='on']) .backdrop svg g {
     animation-play-state: paused;
   }
@@ -1112,3 +1147,103 @@ h2.stage-title {
   border: 1px solid var(--line);
 }
 .picker-card.on .mark { background: var(--accent); border-color: var(--accent); }
+
+
+/* ====================================================================
+   Breathing text
+
+   Every piece of type drifts between the three stops its station occupies
+   on the logo ramp. Before a dataset arrives there is no station, so the
+   three stops are spread end to end and the page cycles the whole ramp;
+   once a station is known they close to three adjacent stops and the text
+   breathes within that region.
+
+   Two speeds. Display type and labels take the full swing, since a heading
+   changing colour is legible at a glance. Body copy takes a narrower,
+   slower one — prose that shifts hue while you are reading a sentence is
+   tiring, and the numbers in the results tables have to stay readable.
+
+   Durations are staggered and coprime so nothing pulses in lockstep.
+   ==================================================================== */
+
+@keyframes breatheText {
+  0%, 100% { color: var(--breathe-1); }
+  33%      { color: var(--breathe-2); }
+  66%      { color: var(--breathe-3); }
+}
+
+/* the same cycle, held closer to the resting ink so long text stays calm */
+@keyframes breatheProse {
+  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 42%, var(--ink)); }
+  33%      { color: color-mix(in srgb, var(--breathe-2) 42%, var(--ink)); }
+  66%      { color: color-mix(in srgb, var(--breathe-3) 42%, var(--ink)); }
+}
+
+@keyframes breatheMuted {
+  0%, 100% { color: color-mix(in srgb, var(--breathe-1) 34%, var(--muted)); }
+  33%      { color: color-mix(in srgb, var(--breathe-2) 34%, var(--muted)); }
+  66%      { color: color-mix(in srgb, var(--breathe-3) 34%, var(--muted)); }
+}
+
+/* display type and labels — full swing */
+.ambient h1,
+.ambient h2,
+.ambient h3,
+.ambient h4,
+.ambient .mark,
+.ambient .eyebrow,
+.ambient .lab,
+.ambient .stage-index,
+.ambient .wordmark-sub,
+.ambient .scroll-hint,
+.ambient .picker-card .t,
+.ambient .card .val,
+.ambient .brand h2,
+.ambient thead th {
+  animation: breatheText 11s ease-in-out infinite;
+}
+
+.ambient h2 { animation-delay: -1.7s; }
+.ambient .eyebrow { animation-delay: -3.1s; }
+.ambient .lab { animation-delay: -4.3s; }
+.ambient .card .val { animation-delay: -2.3s; }
+.ambient thead th { animation-delay: -5.1s; }
+.ambient .stage-index { animation-delay: -6.7s; }
+.ambient .scroll-hint { animation-delay: -8.3s; }
+
+/* prose — narrower swing, slower */
+.ambient p,
+.ambient li,
+.ambient .lede,
+.ambient td,
+.ambient .chip,
+.ambient label,
+.ambient summary {
+  animation: breatheProse 17s ease-in-out infinite;
+}
+
+.ambient li { animation-delay: -3.7s; }
+.ambient td { animation-delay: -6.1s; }
+.ambient .chip { animation-delay: -2.9s; }
+
+/* the quiet supporting text, quieter still */
+.ambient .caption,
+.ambient .masthead .sub,
+.ambient .note-box,
+.ambient .card .note,
+.ambient .drop .small,
+.ambient .picker-card .b {
+  animation: breatheMuted 23s ease-in-out infinite;
+}
+
+.ambient .card .note { animation-delay: -5.3s; }
+.ambient .note-box { animation-delay: -9.7s; }
+
+/* Anything sitting on a filled accent keeps its fixed dark ink — the text is
+   on the colour, not made of it. */
+.ambient .btn,
+.ambient .seg button.on,
+.ambient .chip.on {
+  animation: none;
+  color: var(--on-accent);
+}
