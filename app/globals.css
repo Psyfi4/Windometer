@@ -706,7 +706,8 @@ svg text { font-family: var(--body); }
   }
 
   .app-root:not([data-motion='on']) .ambient h2.stage-title,
-  .app-root:not([data-motion='on']) .ambient .brand h2 {
+  .app-root:not([data-motion='on']) .ambient .brand h2,
+  .app-root:not([data-motion='on']) .ambient .btn:not(:disabled) {
     animation: none;
     background-position: 30% 50%;   /* held mid-drift, still gradient-filled */
   }
@@ -1257,6 +1258,29 @@ h2.stage-title {
   color: var(--on-accent);
 }
 
+/* The primary action radiates, but only across the station's own bracket —
+   the working surfaces identify the station, while the titles above keep the
+   full ramp. Segmented controls and chips stay flat: a dozen small elements
+   all shimmering at once reads as noise rather than as one thing breathing. */
+.ambient .btn:not(:disabled) {
+  background-image: linear-gradient(
+    100deg,
+    var(--breathe-1) 0%,
+    var(--breathe-2) 25%,
+    var(--breathe-3) 50%,
+    var(--breathe-2) 75%,
+    var(--breathe-1) 100%
+  );
+  background-size: 280% 100%;
+  animation: btnDrift 9s ease-in-out infinite;
+  color: var(--on-accent);
+}
+
+@keyframes btnDrift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
 
 /* ====================================================================
    Stage titles
@@ -1277,26 +1301,40 @@ h2.stage-title {
    thing behind @supports risks the query itself failing.
    ==================================================================== */
 
-.ambient h2.stage-title,
-.ambient .brand h2 {
+/* Titles carry the whole ramp, not the station's bracket.
+
+   Once a dataset lands, everything tied to --breathe-* narrows to that
+   station's three stops. The titles deliberately do not: they keep the full
+   indigo-to-amber sweep, the same range as the mark, so the page still shows
+   its whole palette while the working surfaces below identify the station.
+
+   The stops are written out rather than read from --breathe-*, which is what
+   makes that independence work — and means the fill survives even if the
+   theme variables never arrive.
+
+   Palindromic, so drifting the position loops without a seam. */
+h2.stage-title,
+.brand h2 {
   background-image: linear-gradient(
     100deg,
-    var(--breathe-1) 0%,
-    var(--breathe-2) 25%,
-    var(--breathe-3) 50%,
-    var(--breathe-2) 75%,
-    var(--breathe-1) 100%
+    #4D62D5 0%,    #7A40C8 6.25%,  #B62FC7 12.5%, #E634C7 18.75%,
+    #F051B0 25%,   #F5699A 31.25%, #F27B75 37.5%, #F79262 43.75%,
+    #F5B35E 50%,
+    #F79262 56.25%, #F27B75 62.5%, #F5699A 68.75%, #F051B0 75%,
+    #E634C7 81.25%, #B62FC7 87.5%, #7A40C8 93.75%, #4D62D5 100%
   );
-  background-size: 280% 100%;
+  background-size: 300% 100%;
+  background-position: 18% 50%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: titleDrift 13s ease-in-out infinite;
 }
 
-/* out of step with each other, so no two headings sweep in unison */
-.ambient .stage:nth-of-type(even) h2.stage-title { animation-delay: -4.4s; }
-.ambient .stage:nth-of-type(3n) h2.stage-title { animation-delay: -7.9s; }
+/* the drift is the part that needs ambience; the fill above does not */
+.ambient h2.stage-title,
+.ambient .brand h2 {
+  animation: titleDrift 13s ease-in-out infinite;
+}
 
 @keyframes titleDrift {
   0%, 100% { background-position: 0% 50%; }
