@@ -702,11 +702,22 @@ function Wordmark({ ambience, moving }) {
       <svg
         className="wordmark-svg"
         // The fallback is only on screen for the frame or two before the real
-        // measurement lands, but it should still be close: 940x140 is roughly
-        // what WINDLAB measures at font-size 190, where the old 1000x200 left
-        // 8% of dead space to its right and 60 units of it below the baseline —
-        // which is exactly how the mark came to sit left of centre and high.
+        // measurement lands, but it should still be close: 940x142 is roughly
+        // what WINDLAB measures at font-size 190.
         viewBox={box ? `${box.x} ${box.y} ${box.w} ${box.h}` : '0 20 940 142'}
+        // Stated explicitly, and this is load-bearing.
+        //
+        // width:100% with height:auto asks the browser to derive the height
+        // from a percentage width. Inside a grid track being sized at the same
+        // moment that is circular, and it resolves to something far shorter —
+        // measured at 181px where the width implied 262px. preserveAspectRatio
+        // then shrank the letters to fit that height, so the mark came out a
+        // third narrower than its box and the short middle row threw the
+        // vertical centring out as well.
+        //
+        // An explicit ratio removes the circularity: height follows width, and
+        // the letters fill the box instead of being fitted inside it.
+        style={{ aspectRatio: box ? `${box.w} / ${box.h}` : '940 / 142' }}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Windlab"

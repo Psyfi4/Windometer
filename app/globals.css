@@ -1097,7 +1097,10 @@ svg text { font-family: var(--body); }
   height: auto;
   /* Only bites on an unusually short window, where the mark would otherwise
      eat the middle row and leave the caption nowhere to go. Everywhere else
-     width is what binds and this does nothing. */
+     width is what binds and this does nothing.
+
+     Note this cannot letterbox the letters now that the element states its own
+     aspect ratio — when the cap applies, the whole element shrinks. */
   max-height: 42dvh;
   /* The gradient slides inside the letterforms via SMIL on the gradient
      itself — see page.jsx. Filtering the hue here would take it off palette. */
