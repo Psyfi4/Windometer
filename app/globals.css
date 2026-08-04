@@ -1001,29 +1001,38 @@ svg text { font-family: var(--body); }
 
 /* The mark alone decides where the centre is.
 
-   Centring the whole stack puts the *group's* midpoint on the centre line,
-   which leaves the mark floating above it by half the height of whatever hangs
-   below. A fixed padding to compensate only works at one viewport width, since
-   the text below rewraps as the window changes.
+   Three attempts got here, and the first two are worth recording because each
+   fixed the centring and broke something else:
 
-   Zero height was the next attempt and was worse: with overflow visible the
-   caption's top margin collapses straight through it into the flex layout, so
-   the mark still shifted, and the first line rode up over the mark's foot.
+     padding compensation  a guessed constant, right at one viewport width only
+     zero-height caption   its top margin collapsed straight through the box,
+                           so the mark still moved and the first line rode up
+                           over the mark's foot
+     absolute caption      centred correctly, but out of flow means nothing
+                           knows how tall it is, so it ran into the scroll hint
+                           and spilled toward the next stage
 
-   Taking the caption out of flow entirely settles both. The stage-inner is
-   then exactly as tall as the mark, so the flex centring lands the mark on the
-   centre line at any size; the caption hangs from its bottom edge with nothing
-   to collapse into. */
+   A three-row grid does it without any of that. The mark sits in the middle
+   row with equal fractional rows above and below, so it is centred by the
+   geometry rather than by compensating for anything. The caption sits in the
+   lower row, in flow, where its height is accounted for and it cannot overlap
+   what comes after it. */
 .stage.hero .stage-inner {
-  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  justify-items: center;
+  align-content: stretch;
+  min-height: calc(100dvh - 10rem);
+  width: 100%;
 }
 
+.stage.hero .hero-mark { grid-row: 2; }
+
 .stage.hero .hero-caption {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  grid-row: 3;
+  align-self: start;
   margin-top: 1.7rem;
+  width: 100%;
 }
 
 .stage.hero .stage-inner {
@@ -1075,6 +1084,12 @@ svg text { font-family: var(--body); }
   display: block;
   width: 100%;
   height: auto;
+  /* The mark is roughly 6.6:1, so at full window width it is only about 280px
+     tall on a 1920-wide screen — width is what binds almost everywhere, and
+     this cap does nothing. It earns its place only on an unusually short
+     window (below about 610px tall at 1920 wide), where without it the mark
+     would eat the middle row and push the caption off the bottom. */
+  max-height: 46dvh;
   /* The gradient slides inside the letterforms via SMIL on the gradient
      itself — see page.jsx. Filtering the hue here would take it off palette. */
   filter: saturate(1.15);
@@ -1121,6 +1136,13 @@ svg text { font-family: var(--body); }
   text-transform: uppercase;
   color: var(--dim);
 }
+/* On a short window the lower row leaves no room beneath the caption, and the
+   hint — anchored to the stage foot — lands on top of it. It is an affordance,
+   not information, so it gives way. */
+@media (max-height: 760px) {
+  .stage.hero .scroll-hint { display: none; }
+}
+
 .scroll-hint::after {
   content: ' ↓';
   display: inline-block;
