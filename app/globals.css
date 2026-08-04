@@ -1002,19 +1002,28 @@ svg text { font-family: var(--body); }
 /* The mark alone decides where the centre is.
 
    Centring the whole stack puts the *group's* midpoint on the centre line,
-   which leaves the mark floating above it by half the height of whatever
-   hangs below. Compensating with a fixed padding — which is what this used to
-   do — only works at one viewport width, because the text below rewraps and
-   changes height as the window changes.
+   which leaves the mark floating above it by half the height of whatever hangs
+   below. A fixed padding to compensate only works at one viewport width, since
+   the text below rewraps as the window changes.
 
-   Giving the caption no height takes it out of the calculation entirely. The
-   flex centring then sees the mark and nothing else, so the mark lands on the
-   centre line exactly, at any size; the caption still paints, immediately
-   beneath it, because the overflow is visible. */
+   Zero height was the next attempt and was worse: with overflow visible the
+   caption's top margin collapses straight through it into the flex layout, so
+   the mark still shifted, and the first line rode up over the mark's foot.
+
+   Taking the caption out of flow entirely settles both. The stage-inner is
+   then exactly as tall as the mark, so the flex centring lands the mark on the
+   centre line at any size; the caption hangs from its bottom edge with nothing
+   to collapse into. */
+.stage.hero .stage-inner {
+  position: relative;
+}
+
 .stage.hero .hero-caption {
-  height: 0;
-  overflow: visible;
-  width: 100%;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 1.7rem;
 }
 
 .stage.hero .stage-inner {
@@ -1028,8 +1037,8 @@ svg text { font-family: var(--body); }
   transform: translateX(-50%);
 }
 .stage.hero .hero-lede { margin-left: auto; margin-right: auto; }
-.stage.hero .wordmark-sub { margin-top: 1.9rem; }
-.stage.hero .hero-lede { margin-top: 1.4rem; }
+.stage.hero .wordmark-sub { margin-top: 0; }
+.stage.hero .hero-lede { margin-top: 1.3rem; }
 
 .stage-inner { width: 100%; }
 
