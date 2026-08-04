@@ -533,7 +533,11 @@ svg text { font-family: var(--body); }
      from sweeping the sampled ramp round the perimeter instead. */
   filter: saturate(1.6) brightness(1.08);
   animation:
-    frameSweep 18s linear infinite,
+    /* A rotating conic gradient repaints a ring the full size of the window.
+       Stepped finely enough to still read as rotation — ten a second rather
+       than sixty. edgeBreathe is left alone: it animates opacity, which the
+       compositor handles without repainting anything. */
+    frameSweep 18s steps(180, end) infinite,
     edgeBreathe 5s ease-in-out infinite;
 }
 
@@ -898,9 +902,15 @@ svg text { font-family: var(--body); }
   to   { opacity: 1; transform: none; }
 }
 
+/* letter-spacing is gone from this.
+
+   Animating it re-lays-out the text on every frame — not a repaint but a
+   reflow, which is dearer still, and it ran on every section label in the
+   document as it scrolled past. The same arrival reads fine from opacity and
+   a nudge, both of which the compositor handles without touching layout. */
 @keyframes revealLabel {
-  from { opacity: 0; transform: translateX(-10px); letter-spacing: 0.28em; }
-  to   { opacity: 1; transform: none; letter-spacing: 0.16em; }
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ====================================================================
@@ -1256,8 +1266,20 @@ h2.stage-title {
   inherits: true;
 }
 
+/* steps(), and this is the single biggest cost on the page.
+
+   --ink and --muted are inherited, so animating them repaints every element
+   that reads them — the whole content column. Continuously, that is a
+   full-page repaint sixty times a second, and colour cannot be composited on
+   the GPU, so every one of them is real work. Measured against a recording,
+   the browser was managing about two painted frames a second while the scroll
+   loop asked for sixty.
+
+   The drift takes nineteen seconds to go round. It does not need sixty updates
+   a second to do that; thirty-eight steps is one every half second, which for
+   a slow colour change is indistinguishable and costs a thirtieth as much. */
 .ambient .main {
-  animation: inheritedBreathe 19s ease-in-out infinite;
+  animation: inheritedBreathe 19s steps(38, end) infinite;
 }
 
 @keyframes inheritedBreathe {
@@ -1296,7 +1318,8 @@ h2.stage-title {
 .ambient .card .val,
 .ambient .brand h2,
 .ambient thead th {
-  animation: breatheText 11s ease-in-out infinite;
+  /* stepped for the same reason as .main above, though the area is smaller */
+  animation: breatheText 11s steps(33, end) infinite;
 }
 
 .ambient h2 { animation-delay: -1.7s; }
