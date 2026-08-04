@@ -640,7 +640,9 @@ export default function Page() {
 
 function Wordmark({ ambience, moving }) {
   const textRef = useRef(null);
+  const wrapRef = useRef(null);
   const [box, setBox] = useState(null);
+  const [wrapW, setWrapW] = useState(0);
 
   useEffect(() => {
     const node = textRef.current;
@@ -690,34 +692,56 @@ function Wordmark({ ambience, moving }) {
     if (ro) ro.observe(node);
     window.addEventListener('resize', fit);
 
+    // Measure the container too, so the height can be set outright.
+    //
+    // Three attempts to have CSS derive it all failed the same way: width:100%
+    // with height:auto, then an explicit aspect-ratio, both inside a grid track.
+    // A grid item stretches to its row by default, and a stretched item whose
+    // height is auto makes the row height and the item height depend on each
+    // other — so the ratio is never reached, the element keeps some other
+    // height, and preserveAspectRatio quietly shrinks the letters to fit it.
+    // Measured at 180px tall where the width implied 262, which is exactly the
+    // third of the width that went missing.
+    //
+    // Given the width and the ratio, the height is arithmetic. Doing it here
+    // removes the circularity rather than negotiating with it.
+    const wrap = wrapRef.current;
+    const measureWrap = () => {
+      if (!live || !wrap) return;
+      const w = wrap.clientWidth;
+      if (w > 0) setWrapW(w);
+    };
+    measureWrap();
+    const wro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(measureWrap)
+      : null;
+    if (wro && wrap) wro.observe(wrap);
+    window.addEventListener('resize', measureWrap);
+
     return () => {
       live = false;
       window.removeEventListener('resize', fit);
+      window.removeEventListener('resize', measureWrap);
       if (ro) ro.disconnect();
+      if (wro) wro.disconnect();
     };
   }, []);
 
+  // width times the measured ratio, in pixels, with nothing left to infer
+  const ratio = box ? box.w / box.h : 940 / 142;
+  const svgHeight = wrapW > 0 ? `${Math.round(wrapW / ratio)}px` : undefined;
+
   return (
-    <div className="hero-mark">
+    <div className="hero-mark" ref={wrapRef}>
       <svg
         className="wordmark-svg"
         // The fallback is only on screen for the frame or two before the real
         // measurement lands, but it should still be close: 940x142 is roughly
         // what WINDLAB measures at font-size 190.
         viewBox={box ? `${box.x} ${box.y} ${box.w} ${box.h}` : '0 20 940 142'}
-        // Stated explicitly, and this is load-bearing.
-        //
-        // width:100% with height:auto asks the browser to derive the height
-        // from a percentage width. Inside a grid track being sized at the same
-        // moment that is circular, and it resolves to something far shorter —
-        // measured at 181px where the width implied 262px. preserveAspectRatio
-        // then shrank the letters to fit that height, so the mark came out a
-        // third narrower than its box and the short middle row threw the
-        // vertical centring out as well.
-        //
-        // An explicit ratio removes the circularity: height follows width, and
-        // the letters fill the box instead of being fitted inside it.
-        style={{ aspectRatio: box ? `${box.w} / ${box.h}` : '940 / 142' }}
+        // Height in pixels, computed from the measured width and ratio. See the
+        // note in the effect for why this is not left to CSS.
+        style={{ height: svgHeight, aspectRatio: `${ratio}` }}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Windlab"
