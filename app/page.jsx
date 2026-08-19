@@ -2149,6 +2149,20 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
     () => collectCharts(document, { section }),
   );
 
+  /**
+   * The tables and metric cards, which are not charts and were being missed.
+   *
+   * The four CSVs below cover the leaderboard, the monthly Weibull table, the
+   * predictions and the significance matrix. Everything else on screen is
+   * HTML rather than SVG — the record summary, gap treatment, the whole-record
+   * Weibull fit, hub-height power density, per-model accuracy, extreme-wind
+   * behaviour, Bland-Altman, the published reference — so the chart collector
+   * never saw any of it and it was leaving the export entirely.
+   */
+  const tablesOnPage = (section) => withAllStagesRendered(
+    () => collectTables(document, { section }),
+  );
+
   const saveCharts = async (format, section = null) => {
     const found = await chartsOnPage(section);
     if (!found.length) {
@@ -2235,6 +2249,198 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
     }
   };
 
+  const saveTables = async (section = null) => {
+    setBusy('tables');
+    setNote(null);
+    try {
+      const found = await tablesOnPage(section);
+      if (!found.length) {
+        setNote('No tables on the page. Switch some sections on under Choose the output first.');
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadBlob(
+        `windlab-tables-${stamp}.zip`,
+        makeZip(found.map(({ name, data }) => ({ name: `tables/${name}.csv`, data }))),
+      );
+      setNote(`Saved ${found.length} table${found.length === 1 ? '' : 's'}.`);
+    } catch (err) {
+      setNote(err?.message || 'Those tables could not be saved.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * Every quantity the run produced, as data rather than as a picture.
+   *
+   * Six things were reaching the export only as a drawn line — the diurnal
+   * profile, the speed histogram, the Weibull quantiles, bias by decile, lag
+   * importance and the training curves. A chart is not a record of its own
+   * data; reading numbers back off an SVG is not something anyone should have
+   * to do. These are built from the computed objects directly.
+   *
+   * Derived quantities that can be recovered from what is already here are
+   * left out on purpose. Bland-Altman pairs and the density scatter both fall
+   * out of predictions.csv, and writing them again would add tens of megabytes
+   * of the same numbers in a different arrangement.
+   */
+  const dataFiles = () => {
+    const files = [];
+    const add = (name, rows) => {
+      if (rows && rows.length) files.push({ name, data: toCsv(rows) });
+    };
+
+    /* ---- the record itself ---- */
+    const sum = dataset.summary;
+    add('data/dataset/summary.csv', [{
+      file: file?.name ?? '', station: site, start_year: sum.startYear,
+      end_year: sum.endYear, years: sum.nYears, hourly_rows: sum.nHours,
+      mean_ms: sum.mean, max_ms: sum.max, p95_ms: sum.p95, layout: dataset.format,
+    }]);
+
+    const rep = dataset.report;
+    add('data/dataset/gap_report.csv', [{
+      missing_before: rep.missingBefore, missing_pct: rep.missingPct,
+      missing_after: rep.missingAfter,
+      filled_interpolation: rep.filledInterpolation,
+      filled_monthly_median: rep.filledMonthlyMedian,
+      filled_record_median: rep.filledGlobalMedian,
+    }]);
+
+    try {
+      add('data/dataset/diurnal_profile.csv',
+        D.diurnalProfile(dataset.values, dataset.parts.hours)
+          .map((p, i) => ({ hour: i, mean_ms: p.mean, sd_ms: p.sd })));
+    } catch { /* profile unavailable */ }
+
+    try {
+      add('data/dataset/histogram.csv',
+        D.histogram(dataset.values, 60)
+          .map((b) => ({ bin_centre_ms: b.centre, count: b.count, density: b.density })));
+    } catch { /* histogram unavailable */ }
+
+    /* ---- the statistical fit ---- */
+    const an = weibull.annual;
+    add('data/weibull/annual.csv', [{
+      k: an.k, s_ms: an.s, energy_pattern_factor: an.epf,
+      observed_mean_ms: an.meanObserved, weibull_mws_ms: an.mwsWeibull,
+      shear_exponent: an.alpha,
+    }]);
+    add('data/weibull/hub_heights.csv',
+      HUB_HEIGHTS.map((h) => ({
+        height_m: h, k: an.heights[h].k, s_ms: an.heights[h].s,
+        mws_ms: an.heights[h].mws, wpd_wm2: an.heights[h].wpd,
+      })));
+    try {
+      add('data/weibull/qq.csv',
+        W.weibullQQ(dataset.values, an.k, an.s, 40)
+          .map((q) => ({ observed_ms: q.observed, theoretical_ms: q.theoretical })));
+    } catch { /* quantiles unavailable */ }
+
+    /* ---- accuracy, across models ---- */
+    add('data/models/leaderboard.csv', board.map((r) => ({
+      model: r.Model, type: r.Type, rmse_ms: r.rmse, mae_ms: r.mae,
+      r2: r.r2, mape_pct: r.mape, rmse_scaled: r.rmseScaled,
+      mae_scaled: r.maeScaled, train_seconds: r.seconds,
+    })));
+    add('data/models/intervals.csv', names.map((n) => ({
+      model: n,
+      rmse_scaled: evals[n].rmseCI?.point, rmse_ci_lo: evals[n].rmseCI?.lo,
+      rmse_ci_hi: evals[n].rmseCI?.hi,
+      mae_scaled: evals[n].maeCI?.point, mae_ci_lo: evals[n].maeCI?.lo,
+      mae_ci_hi: evals[n].maeCI?.hi,
+      bootstrap_resamples: preset.nBootstrap, block_hours: 24,
+    })));
+    add('data/models/tail_behaviour.csv', names.map((n) => ({
+      model: n, p95_threshold_ms: evals[n].tail.threshold,
+      tail_rmse: evals[n].tail.tailRmse, tail_mae: evals[n].tail.tailMae,
+      exceedance_recall: evals[n].tail.exceedanceRecall, tail_events: evals[n].tail.nTail,
+    })));
+
+    /* ---- and per model ---- */
+    const yTest = features.test.y;
+    for (const n of names) {
+      const res = results[n];
+      const dir = `data/models/${slug(n)}`;
+      if (!res || res.failed) continue;
+
+      try {
+        const ba = S.blandAltman(yTest, res.predictions);
+        add(`${dir}/bland_altman.csv`, [{
+          model: n, bias_ms: ba.bias, sd_ms: ba.sd,
+          loa_lower_ms: ba.loaLower, loa_upper_ms: ba.loaUpper,
+          within_pct: ba.withinPct,
+        }]);
+      } catch { /* not available for this model */ }
+
+      try {
+        add(`${dir}/bias_by_decile.csv`,
+          S.biasByDecile(yTest, res.predictions).map((d, i) => ({
+            decile: i + 1, observed_centre_ms: d.obsCentre, mean_error_ms: d.meanError,
+          })));
+      } catch { /* not available */ }
+
+      if (res.extras?.importance) {
+        add(`${dir}/lag_importance.csv`, res.extras.importance.map((v, i) => ({
+          lag_hours: i + 1, importance: v,
+          passed_to_sequence_model: res.extras.selectedFeatures
+            ? res.extras.selectedFeatures.includes(`Lag_${i + 1}`) : '',
+        })));
+      }
+
+      if (res.extras?.history) {
+        const h = res.extras.history;
+        const loss = h.loss ?? h.trainLoss ?? [];
+        const val = h.valLoss ?? h.val_loss ?? [];
+        add(`${dir}/training_history.csv`, loss.map((v, i) => ({
+          epoch: i + 1, loss: v, val_loss: val[i] ?? '',
+        })));
+      }
+
+      if (res.extras?.weightCurve) {
+        add(`${dir}/blend_weight_search.csv`, res.extras.weightCurve.map((p) => ({
+          weight: p.w ?? p.weight, error: p.rmse ?? p.value ?? p.error,
+        })));
+      }
+
+      if (res.extras?.metaWeights) {
+        add(`${dir}/meta_weights.csv`,
+          Object.entries(res.extras.metaWeights).map(([term, value]) => ({ term, value })));
+      }
+
+      if (res.extras?.residualSd !== undefined) {
+        add(`${dir}/residuals.csv`, [{
+          model: n, residual_mean_ms: res.extras.residualMean,
+          residual_sd_ms: res.extras.residualSd,
+        }]);
+      }
+    }
+
+    return files;
+  };
+
+  const saveData = async () => {
+    setBusy('data');
+    setNote(null);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      const entries = [
+        ...dataFiles(),
+        { name: 'data/predictions.csv', data: predictionsCsv() },
+        { name: 'data/weibull/monthly.csv', data: weibullCsv() },
+        { name: 'data/run_settings.json', data: JSON.stringify(settings, null, 2) },
+      ];
+      if (names.length > 1) entries.push({ name: 'data/diebold_mariano.csv', data: dmCsv() });
+      downloadBlob(`windlab-data-${stamp}.zip`, makeZip(entries));
+      setNote(`Saved ${entries.length} data files.`);
+    } catch (err) {
+      setNote(err?.message || 'That data could not be assembled.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   /** Everything at once: the figures, every table, and the run settings. */
   const saveEverything = async () => {
     setBusy('all');
@@ -2243,14 +2449,19 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
       const stamp = new Date().toISOString().slice(0, 10);
       const entries = [
         { name: 'model_metrics.csv', data: metricsCsv() },
-        { name: 'test_predictions.csv', data: predictionsCsv() },
-        { name: 'weibull_monthly.csv', data: weibullCsv() },
         { name: 'run_settings.json', data: JSON.stringify(settings, null, 2) },
+        { name: 'data/predictions.csv', data: predictionsCsv() },
+        { name: 'data/weibull/monthly.csv', data: weibullCsv() },
+        ...dataFiles(),
       ];
-      if (names.length > 1) entries.push({ name: 'diebold_mariano.csv', data: dmCsv() });
+      if (names.length > 1) entries.push({ name: 'data/diebold_mariano.csv', data: dmCsv() });
 
       for (const { svg, name } of await chartsOnPage()) {
         entries.push({ name: `charts/${name}.svg`, data: svgToString(svg, { background: '#ffffff' }) });
+      }
+
+      for (const { name, data } of await tablesOnPage()) {
+        entries.push({ name: `tables/${name}.csv`, data });
       }
 
       // and the per-model figures for every model, not just the selected one
@@ -2281,12 +2492,20 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
           `Effort       ${presetName}`,
           `Test share   ${(testSize * 100).toFixed(0)}%`,
           '',
-          'model_metrics.csv      accuracy per model, with bootstrap intervals and tail behaviour',
-          'test_predictions.csv   the observed series and every model against it, hour by hour',
-          'weibull_monthly.csv    Weibull fit and power density by month, at each hub height',
-          'diebold_mariano.csv    pairwise p-values; small means the difference is resolved',
-          'run_settings.json      exactly what produced the above',
+          'model_metrics.csv      accuracy per model, at a glance',
+          'run_settings.json      exactly what produced everything here',
+          '',
+          'data/                  every quantity the run computed, as numbers',
+          '  dataset/             record summary, gap treatment, diurnal profile, histogram',
+          '  weibull/             annual fit, hub heights, monthly table, Q-Q quantiles',
+          '  models/              leaderboard, bootstrap intervals, tail behaviour,',
+          '                       and per model: Bland-Altman, bias by decile, lag',
+          '                       importance, training curves, blend search, meta weights',
+          '  predictions.csv      the observed series and every model against it, hour by hour',
+          '  diebold_mariano.csv  pairwise p-values; small means the difference is resolved',
           'charts/                the figures as they appeared, as SVG',
+          'charts/per-model/      the same, for each model in turn',
+          'tables/                every table and metric card on the page, as CSV',
           '',
           'Charts are vector and carry their own styling, so they can be opened',
           'or edited anywhere.',
@@ -2323,6 +2542,35 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
         reach for when something will only accept an image.
       </div>
       {note && <div style={{ marginTop: '0.8rem' }}><Note tone="teal">{note}</Note></div>}
+
+      <Eyebrow>The numbers behind the charts</Eyebrow>
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn-ghost" disabled={!!busy} onClick={saveData}>
+          {busy === 'data' ? 'Assembling…' : 'All computed data as CSV'}
+        </button>
+      </div>
+      <div className="caption">
+        Six quantities reach the page only as a drawn line — the diurnal
+        profile, the speed histogram, the Weibull quantiles, bias by decile,
+        lag importance and the training curves. This writes those out as
+        numbers, along with everything else the run computed, so nothing has to
+        be read back off a picture.
+      </div>
+
+      <Eyebrow>Tables and figures</Eyebrow>
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn-ghost" disabled={!!busy} onClick={saveTables}>
+          {busy === 'tables' ? 'Reading…' : 'Tables and cards as CSV'}
+        </button>
+      </div>
+      <div className="caption">
+        The four CSVs below cover the leaderboard, the monthly Weibull table,
+        the predictions and the significance matrix. This takes everything
+        else that is on screen as text rather than a figure — the record
+        summary, gap treatment, the whole-record fit, hub-height power density,
+        per-model accuracy, extreme-wind behaviour, Bland-Altman, the published
+        reference — none of which the chart export can see.
+      </div>
 
       <Eyebrow>Every model, one by one</Eyebrow>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2379,3 +2627,4 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
     </>
   );
 }
+
