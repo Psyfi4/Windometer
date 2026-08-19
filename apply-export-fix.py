@@ -203,8 +203,52 @@ const slugForFile = (name) => String(name || 'run')
 
 const toCsv = (rows) => {"""
 
+BLURB_OLD = """  { key: 'Export', title: 'Export', blurb: 'Metrics, predictions and tables as CSV, plus the exact run settings.' },"""
+BLURB_NEW = """  { key: 'Export', title: 'Export', blurb: 'Every chart as SVG or PNG, every table as CSV, the run settings — separately or as one archive.' },"""
+
+JUMP_OLD = """              {showResults && (
+                <div style={{ marginTop: '1.6rem' }}>
+                  <button
+                    className="btn"
+                    style={{ width: 'auto', padding: '0.6rem 1.8rem' }}
+                    onClick={() => document.getElementById('stage-result-0')?.scrollIntoView({ behavior: 'smooth' })}
+                  >
+                    Show {outputs.length} {outputs.length === 1 ? 'section' : 'sections'}
+                  </button>
+                </div>
+              )}"""
+JUMP_NEW = """              {showResults && (
+                <div style={{ marginTop: '1.6rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn"
+                    style={{ width: 'auto', padding: '0.6rem 1.8rem' }}
+                    onClick={() => document.getElementById('stage-result-0')?.scrollIntoView({ behavior: 'smooth' })}
+                  >
+                    Show {outputs.length} {outputs.length === 1 ? 'section' : 'sections'}
+                  </button>
+                  {/* The export controls live at the foot of the page, which with
+                      seven sections switched on is a dozen stages away. This is
+                      where you decide what you want to see, so it is also where
+                      you are most likely to want to take it with you. */}
+                  {outputs.includes('Export') && (
+                    <button
+                      className="btn-ghost"
+                      onClick={() => {
+                        const n = OUTPUTS.filter((o) => outputs.includes(o.key))
+                          .findIndex((o) => o.key === 'Export');
+                        document.getElementById(`stage-result-${n}`)?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Jump to downloads
+                    </button>
+                  )}
+                </div>
+              )}"""
+
 EDITS = [
     ("import the export helpers", IMPORT_OLD, IMPORT_NEW),
+    ("say what the Export section holds", BLURB_OLD, BLURB_NEW),
+    ("add a jump to the downloads", JUMP_OLD, JUMP_NEW),
     ("add state to ExportTab", SIG_OLD, SIG_NEW),
     ("add a filename helper", HELPER_OLD, HELPER_NEW),
     ("add the download controls", BLOCK_OLD, BLOCK_NEW),
