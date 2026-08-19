@@ -28,6 +28,10 @@ import { themeForSite, chartTheme, PALETTE, SITE_THEMES } from '@/lib/theme';
 // unrotated spectrum. Version skew degrades instead of breaking.
 import * as Theme from '@/lib/theme';
 import Backdrop from '@/components/Backdrop';
+import {
+  svgToString, svgToPng, collectCharts, withAllStagesRendered,
+  makeZip, downloadBlob,
+} from '@/lib/export';
 import { useSmoothScroll } from '@/lib/useSmoothScroll';
 import {
   buildRecord, compareRuns, compareWeibull, summarise,
@@ -43,7 +47,7 @@ const OUTPUTS = [
   { key: 'Weibull', title: 'Weibull & power', blurb: 'Shape and scale by the MEPF method, power density at 100, 120 and 150 m.' },
   { key: 'Region', title: 'Region', blurb: 'Where the record comes from, and the other stations in the study.' },
   { key: 'Compare', title: 'Across datasets', blurb: 'Set this run against one saved earlier: per-model deltas, whether the ordering holds between the two records, and the resource assessments side by side.' },
-  { key: 'Export', title: 'Export', blurb: 'Metrics, predictions and tables as CSV, plus the exact run settings.' },
+  { key: 'Export', title: 'Export', blurb: 'Every chart as SVG or PNG, every table as CSV, the run settings — separately or as one archive.' },
 ];
 
 const fmtInt = (n) => n.toLocaleString('en-US');
