@@ -977,7 +977,11 @@ svg text { font-family: var(--body); }
   /* Every chosen output renders at once now that the tabs are gone, so a full
      results page holds every chart simultaneously. This lets the browser skip
      layout and paint for stages that are off screen; the intrinsic size keeps
-     the scrollbar honest while they are skipped. */
+     the scrollbar honest while they are skipped.
+
+     Suspended during an export — see .app-root.exporting below. A skipped
+     stage has no layout, so its charts measure zero and would be left out of
+     the archive without a word. */
   content-visibility: auto;
   contain-intrinsic-size: auto 100vh;
   display: flex;
@@ -1001,6 +1005,10 @@ svg text { font-family: var(--body); }
    and costs the mark its measurement — getBBox cannot measure a subtree the
    browser has skipped. */
 .stage.hero { content-visibility: visible; }
+
+/* Held on for the moment it takes to collect the figures, so that sections
+   which have never been scrolled to are measurable rather than skipped. */
+.app-root.exporting .stage { content-visibility: visible; }
 
 .stage.hero {
   align-items: center;
