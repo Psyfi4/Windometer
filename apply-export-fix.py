@@ -25,7 +25,8 @@ PAGE = Path("app/page.jsx")
 IMPORT_OLD = "import Backdrop from '@/components/Backdrop';"
 IMPORT_NEW = """import Backdrop from '@/components/Backdrop';
 import {
-  svgToString, svgToPng, collectCharts, makeZip, downloadBlob,
+  svgToString, svgToPng, collectCharts, withAllStagesRendered,
+  makeZip, downloadBlob,
 } from '@/lib/export';"""
 
 # ---- the new buttons, and the state behind them ----
@@ -62,12 +63,16 @@ BLOCK_NEW = """  /**
    * collected — which is the behaviour you want, but worth knowing if a
    * figure you expected is missing.
    */
-  const chartsOnPage = () => collectCharts(document);
+  const chartsOnPage = (section) => withAllStagesRendered(
+    () => collectCharts(document, { section }),
+  );
 
-  const saveCharts = async (format) => {
-    const found = chartsOnPage();
+  const saveCharts = async (format, section = null) => {
+    const found = await chartsOnPage(section);
     if (!found.length) {
-      setNote('No charts on the page to save. Scroll through the results first — sections that have never been on screen are not rendered.');
+      setNote(section
+        ? `No ${section} charts on the page. That section may not be switched on under Choose the output.`
+        : 'No charts to save. Switch some sections on under Choose the output first.');
       return;
     }
     setBusy(format);
@@ -83,8 +88,9 @@ BLOCK_NEW = """  /**
           entries.push({ name: `charts/${name}.png`, data: new Uint8Array(await blob.arrayBuffer()) });
         }
       }
-      downloadBlob(`windlab-charts-${stamp}.zip`, makeZip(entries));
-      setNote(`Saved ${entries.length} chart${entries.length === 1 ? '' : 's'} as ${format.toUpperCase()}.`);
+      const tag = section ? `${section}-` : '';
+      downloadBlob(`windlab-${tag}charts-${stamp}.zip`, makeZip(entries));
+      setNote(`Saved ${entries.length} ${section ?? ''} chart${entries.length === 1 ? '' : 's'} as ${format.toUpperCase()}.`.replace('  ', ' '));
     } catch (err) {
       setNote(err?.message || 'Those charts could not be saved.');
     } finally {
@@ -106,7 +112,7 @@ BLOCK_NEW = """  /**
       ];
       if (names.length > 1) entries.push({ name: 'diebold_mariano.csv', data: dmCsv() });
 
-      for (const { svg, name } of chartsOnPage()) {
+      for (const { svg, name } of await chartsOnPage()) {
         entries.push({ name: `charts/${name}.svg`, data: svgToString(svg, { background: '#ffffff' }) });
       }
 
@@ -165,6 +171,22 @@ BLOCK_NEW = """  /**
       </div>
       {note && <div style={{ marginTop: '0.8rem' }}><Note tone="teal">{note}</Note></div>}
 
+      <Eyebrow>One section at a time</Eyebrow>
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+        {OUTPUTS.filter((o) => o.key !== 'Export').map((o) => (
+          <button key={o.key} className="btn-ghost" disabled={!!busy}
+            onClick={() => saveCharts('svg', o.title)}>
+            {o.title}
+          </button>
+        ))}
+      </div>
+      <div className="caption">
+        Just the figures from one part of the results. Sections are matched by
+        their heading, and every stage is laid out before collecting — so a
+        section you have not scrolled to still exports, rather than coming out
+        empty without saying why.
+      </div>
+
       <Eyebrow>Individual files</Eyebrow>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
         <button className="btn-ghost" onClick={() => download('model_metrics.csv', metricsCsv())}>Model metrics</button>"""
@@ -219,7 +241,9 @@ def main() -> int:
     print()
     print(f"  Patched {PAGE}. Previous version at {PAGE}.bak")
     for label, present in [
-        ("collectCharts wired", "collectCharts(document)" in src),
+        ("collectCharts wired", "collectCharts(document, { section })" in src),
+        ("stages forced to lay out first", "withAllStagesRendered" in src),
+        ("per-section export present", "saveCharts('svg', o.title)" in src),
         ("bundle builder present", "saveEverything" in src),
         ("SVG and PNG paths present", "saveCharts('svg')" in src and "saveCharts('png')" in src),
         ("useState available in this file", "useState" in src.split("\n")[10 - 1] or "useState" in src[:2000]),
