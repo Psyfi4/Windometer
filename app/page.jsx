@@ -612,6 +612,7 @@ export default function Page() {
                     board={board} results={results} evals={evals} features={features}
                     weibull={weibull} dataset={dataset} file={file} preset={preset}
                     presetName={presetName} testSize={testSize} unit={unit} site={site}
+                    activeModel={activeModel} setActiveModel={setActiveModel}
                   />
                 )}
               </div>
@@ -2070,7 +2071,7 @@ const toCsv = (rows) => {
   }).join(','))].join('\n');
 };
 
-function ExportTab({ board, results, evals, features, weibull, dataset, file, preset, presetName, testSize, unit, site }) {
+function ExportTab({ board, results, evals, features, weibull, dataset, file, preset, presetName, testSize, unit, site, activeModel, setActiveModel }) {
   const names = Object.keys(evals);
   const [busy, setBusy] = useState(null);
   const [note, setNote] = useState(null);
@@ -2179,6 +2180,61 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
     }
   };
 
+  /**
+   * The per-model figures, for every model rather than the one on screen.
+   *
+   * That section shows one model at a time, chosen from a dropdown, so the
+   * document only ever holds seven charts — the selected model's. Collecting
+   * what is rendered would quietly save one model out of fifteen and give no
+   * sign that the rest were missing.
+   *
+   * So the dropdown is stepped through in code, pausing for each render. The
+   * pause is a timeout plus two frames, not one frame: React has to commit the
+   * state change before the browser can lay anything out, and a single frame
+   * can land between the two and measure the previous model's charts.
+   *
+   * The original selection is restored at the end, including if it fails.
+   */
+  const savePerModel = async (format = 'svg') => {
+    setBusy('models');
+    setNote(null);
+    const original = activeModel;
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      const entries = [];
+
+      for (const model of names) {
+        setActiveModel(model);
+        await new Promise((r) => setTimeout(r, 80));
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const found = await chartsOnPage('Per model');
+        for (const { svg, name } of found) {
+          const path = `charts/per-model/${slug(model)}/${name}.${format}`;
+          if (format === 'svg') {
+            entries.push({ name: path, data: svgToString(svg, { background: '#ffffff' }) });
+          } else {
+            const blob = await svgToPng(svg, { scale: 2, background: '#ffffff' });
+            entries.push({ name: path, data: new Uint8Array(await blob.arrayBuffer()) });
+          }
+        }
+        setNote(`Collecting ${model}… ${entries.length} so far.`);
+      }
+
+      if (!entries.length) {
+        setNote('Nothing collected. The Per model section may not be switched on under Choose the output.');
+        return;
+      }
+      downloadBlob(`windlab-per-model-${stamp}.zip`, makeZip(entries));
+      setNote(`Saved ${entries.length} figures across ${names.length} models.`);
+    } catch (err) {
+      setNote(err?.message || 'Those charts could not be saved.');
+    } finally {
+      if (original) setActiveModel(original);
+      setBusy(null);
+    }
+  };
+
   /** Everything at once: the figures, every table, and the run settings. */
   const saveEverything = async () => {
     setBusy('all');
@@ -2196,6 +2252,22 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
       for (const { svg, name } of await chartsOnPage()) {
         entries.push({ name: `charts/${name}.svg`, data: svgToString(svg, { background: '#ffffff' }) });
       }
+
+      // and the per-model figures for every model, not just the selected one
+      const original = activeModel;
+      for (const model of names) {
+        setActiveModel(model);
+        await new Promise((r) => setTimeout(r, 80));
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        for (const { svg, name } of await chartsOnPage('Per model')) {
+          entries.push({
+            name: `charts/per-model/${slug(model)}/${name}.svg`,
+            data: svgToString(svg, { background: '#ffffff' }),
+          });
+        }
+        setNote(`Collecting ${model}…`);
+      }
+      if (original) setActiveModel(original);
 
       entries.push({
         name: 'README.txt',
@@ -2251,6 +2323,23 @@ function ExportTab({ board, results, evals, features, weibull, dataset, file, pr
         reach for when something will only accept an image.
       </div>
       {note && <div style={{ marginTop: '0.8rem' }}><Note tone="teal">{note}</Note></div>}
+
+      <Eyebrow>Every model, one by one</Eyebrow>
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn-ghost" disabled={!!busy} onClick={() => savePerModel('svg')}>
+          {busy === 'models' ? 'Stepping through…' : `Per-model figures, all ${names.length} (SVG)`}
+        </button>
+        <button className="btn-ghost" disabled={!!busy} onClick={() => savePerModel('png')}>
+          {busy === 'models' ? 'Stepping through…' : 'Same, as PNG'}
+        </button>
+      </div>
+      <div className="caption">
+        The Per model section shows one model at a time, so only that model's
+        figures are ever on the page. This steps the selection through every
+        model and collects each in turn, filing them under{' '}
+        <code>charts/per-model/&lt;model&gt;/</code>. Expect it to take a
+        moment — it waits for each render rather than guessing.
+      </div>
 
       <Eyebrow>One section at a time</Eyebrow>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
